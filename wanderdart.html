@@ -1,0 +1,2836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#1a1410">
+<title>WANDERDART — Pin a Place, Hit the Road</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght,SOFT@9..144,400;9..144,600;9..144,900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<style>
+  :root {
+    --bg: #1a1410;
+    --bg-light: #2a1f17;
+    --cream: #f4ead5;
+    --burgundy: #7c2b1f;
+    --burgundy-dim: #4a1a13;
+    --orange: #e8924b;
+    --rust: #b85a2a;
+    --gold: #d4a949;
+    --ink: #2a1f17;
+    --paper: #ecd9b0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+  body {
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    min-height: 100vh;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    max-width: 480px; margin: 0 auto;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(232,146,75,0.06), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(124,43,31,0.08), transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    max-width: 480px; margin: 0 auto;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' /%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.15 0 0 0 0 0.1 0 0 0 0 0.4 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
+    opacity: 0.18; pointer-events: none; z-index: 1; mix-blend-mode: overlay;
+  }
+  .app { position: relative; z-index: 2; min-height: 100vh; padding-bottom: 100px; }
+
+  /* ====== SCREENS ====== */
+  .screen { display: none; min-height: 100vh; background: var(--bg); }
+  .screen.active { display: block; }
+
+  /* ============ SPLASH ============ */
+  #splash {
+    position: relative;
+    min-height: 100vh;
+    background: var(--bg);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  #splash .bg {
+    position: absolute; inset: 0;
+    z-index: 0;
+  }
+  #splash .bg img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    animation: splashDrift 20s ease-in-out infinite alternate;
+  }
+  @keyframes splashDrift {
+    0%   { transform: scale(1.0) translateY(0); }
+    100% { transform: scale(1.08) translateY(-1.5%); }
+  }
+  #splash .bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 0%, transparent 50%, rgba(26,20,16,0.7) 78%, rgba(26,20,16,0.98) 100%);
+    z-index: 1;
+  }
+  #splash .splash-content {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0 32px 60px;
+    text-align: center;
+    z-index: 2;
+  }
+  #splash .stamp-row {
+    margin-bottom: 18px;
+  }
+  #splash .stamp {
+    display: inline-block;
+    border: 2px solid var(--orange);
+    color: var(--orange);
+    padding: 4px 12px;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    transform: rotate(-3deg);
+    text-transform: uppercase;
+    background: rgba(26,20,16,0.6);
+  }
+  #splash h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 76px;
+    line-height: 0.9;
+    color: var(--cream);
+    letter-spacing: 0.04em;
+    text-shadow:
+      0 0 8px rgba(232,146,75,0.7),
+      0 0 18px rgba(232,146,75,0.4),
+      0 0 30px rgba(124,43,31,0.5),
+      3px 3px 0 var(--burgundy);
+    margin-bottom: 14px;
+  }
+  #splash h1 .amp { color: var(--orange); }
+  @keyframes neonFlicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.65; }
+    94% { opacity: 1; }
+    96% { opacity: 0.85; }
+    97% { opacity: 1; }
+  }
+  #splash h1 { animation: neonFlicker 6s infinite; }
+  #splash .tag {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  #splash .start-btn {
+    background: var(--orange);
+    color: var(--bg);
+    border: none;
+    padding: 18px 40px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    box-shadow: 5px 5px 0 var(--burgundy);
+    transition: all 0.12s;
+    text-transform: uppercase;
+  }
+  #splash .start-btn:active {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 var(--burgundy);
+  }
+  #splash .hank-quote {
+    margin-top: 18px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: rgba(244,234,213,0.7);
+  }
+
+  /* ============ MAIN HEADER ============ */
+  .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(26,20,16,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 2px dashed rgba(244,234,213,0.18);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hank-bubble {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--orange);
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--bg-light);
+  }
+  .hank-bubble img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  .top-title {
+    flex: 1;
+  }
+  .top-title h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    line-height: 1.0;
+    letter-spacing: 0.03em;
+    color: var(--cream);
+    text-shadow: 0 0 6px rgba(232,146,75,0.5), 0 0 12px rgba(124,43,31,0.35);
+  }
+  .top-title h1 .amp { color: var(--orange); }
+  .top-title .sub {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .audio-toggle {
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 6px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ============ MAIN CONTENT ============ */
+  main { padding: 20px 16px 40px; }
+  section {
+    background: rgba(244,234,213,0.04);
+    border: 1px solid rgba(244,234,213,0.12);
+    padding: 18px 14px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  section::before {
+    content: attr(data-num);
+    position: absolute;
+    top: -12px; left: 12px;
+    background: var(--bg);
+    padding: 0 7px;
+    font-family: 'Abril Fatface', serif;
+    color: var(--orange);
+    font-size: 20px;
+  }
+  .sec-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: 18px;
+    margin-bottom: 3px;
+    letter-spacing: -0.01em;
+  }
+  .sec-sub {
+    font-size: 10px;
+    color: rgba(244,234,213,0.55);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 13px;
+  }
+
+  /* CATEGORIES */
+  .cats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .cat {
+    border: 1px solid rgba(244,234,213,0.2);
+    padding: 9px 10px;
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.12s;
+  }
+  .cat.active {
+    background: var(--burgundy);
+    border-color: var(--orange);
+  }
+  .cat .icon { font-size: 14px; }
+  .cat .lbl { flex: 1; line-height: 1.1; }
+  .cat .count {
+    font-size: 9px;
+    color: var(--gold);
+    opacity: 0.8;
+  }
+
+  /* CHIPS */
+  .quick-row, .dist-presets {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .chip {
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.25);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 6px 9px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .chip.solid {
+    background: var(--orange); color: var(--bg); border-color: var(--orange);
+  }
+  .chip.active {
+    background: var(--burgundy); border-color: var(--orange); color: var(--orange);
+  }
+
+  .states {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 3px;
+    border: 1px solid rgba(244,234,213,0.1);
+  }
+  .st {
+    background: rgba(244,234,213,0.04);
+    border: 1px solid transparent;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 6px 0;
+    cursor: pointer;
+    text-align: center;
+  }
+  .st.active { background: var(--burgundy); border-color: var(--orange); }
+
+  /* DISTANCE */
+  .dist-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .dist-input {
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 8px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    width: 100px;
+    letter-spacing: 0.1em;
+  }
+  .dist-note {
+    margin-top: 6px;
+    font-size: 10px;
+    color: rgba(244,234,213,0.5);
+  }
+
+  /* === NEW DISTANCE UI (toggle + slider) === */
+  .dist-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .dist-toggle-label {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--cream);
+  }
+  .dist-switch {
+    position: relative;
+    width: 52px;
+    height: 30px;
+    border-radius: 16px;
+    border: none;
+    background: rgba(244,234,213,0.18);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s;
+    padding: 0;
+  }
+  .dist-switch.on { background: var(--orange); }
+  .dist-switch-knob {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--cream);
+    transition: transform 0.2s cubic-bezier(0.3,0.8,0.4,1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .dist-switch.on .dist-switch-knob { transform: translateX(22px); }
+
+  .dist-body {
+    margin-top: 16px;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease;
+  }
+  .dist-body.open {
+    max-height: 240px;
+    opacity: 1;
+  }
+  .dist-slider-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .dist-slider-from {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(244,234,213,0.55);
+  }
+  .dist-slider-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--orange);
+    letter-spacing: 0.03em;
+  }
+  .dist-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--orange) 0%, var(--orange) 50%, rgba(244,234,213,0.2) 50%, rgba(244,234,213,0.2) 100%);
+    outline: none;
+    margin: 6px 0 14px;
+  }
+  .dist-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 3px solid var(--orange);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .dist-slider::-moz-range-thumb {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 3px solid var(--orange);
+    cursor: pointer;
+  }
+  .dist-origin-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dist-origin-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--orange);
+    color: var(--orange);
+    padding: 10px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .dist-origin-btn.located {
+    background: var(--orange);
+    color: var(--bg);
+  }
+  .dist-or {
+    font-size: 10px;
+    color: rgba(244,234,213,0.45);
+  }
+  .dist-zip {
+    width: 70px;
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 10px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-align: center;
+    border-radius: 2px;
+  }
+
+  /* SEGMENTS */
+  .segments {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border: 1px solid rgba(244,234,213,0.25);
+  }
+  .seg {
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(244,234,213,0.18);
+    color: var(--cream);
+    padding: 14px 0;
+    cursor: pointer;
+    font-family: 'Abril Fatface', serif;
+    font-size: 22px;
+  }
+  .seg:last-child { border-right: none; }
+  .seg.active { background: var(--burgundy); color: var(--orange); }
+  .seg-note {
+    font-size: 10px;
+    color: rgba(244,234,213,0.5);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* AIM TOGGLE */
+  .aim-row { display: flex; gap: 8px; }
+  .aim-opt {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.25);
+    color: var(--cream);
+    padding: 12px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .aim-opt.active { background: var(--burgundy); border-color: var(--orange); color: var(--orange); }
+  .aim-opt .label-big {
+    display: block;
+    font-family: 'Abril Fatface', serif;
+    font-size: 16px;
+    margin-bottom: 3px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* THROW BUTTON */
+  .throw-zone {
+    text-align: center;
+    padding: 24px 0 8px;
+  }
+  .throw-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    background: var(--orange);
+    color: var(--bg);
+    border: none;
+    padding: 18px 36px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    box-shadow: 5px 5px 0 var(--burgundy);
+    text-transform: uppercase;
+    transition: all 0.12s;
+  }
+  .throw-btn:active:not(:disabled) {
+    transform: translate(3px, 3px);
+    box-shadow: 2px 2px 0 var(--burgundy);
+  }
+  .throw-btn:disabled { opacity: 0.4; }
+  .pool-info {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+
+  /* HISTORY */
+  .history-list { display: flex; flex-direction: column; gap: 5px; }
+  .h-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 10px;
+    border: 1px solid rgba(244,234,213,0.1);
+    font-size: 11px;
+  }
+  .h-state { color: var(--gold); font-size: 9px; letter-spacing: 0.15em; }
+  .h-empty {
+    color: rgba(244,234,213,0.4);
+    font-size: 10px;
+    font-style: italic;
+    padding: 14px 0;
+    text-align: center;
+  }
+
+  /* ============ STAGE (DART THROWING SCREEN) ============ */
+  #stage {
+    position: fixed;
+    inset: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--bg);
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+  }
+  #stage.show { display: flex; }
+  .stage-top {
+    flex: 0 0 auto;
+    padding: 16px 18px 12px;
+    text-align: center;
+    background: linear-gradient(to bottom, rgba(26,20,16,1), rgba(26,20,16,0.85));
+  }
+  .stage-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 0.04em;
+    color: var(--orange);
+  }
+  .stage-counter {
+    font-size: 10px; color: var(--gold);
+    letter-spacing: 0.3em; margin-top: 3px;
+  }
+  .stage-map-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    margin: 0 12px;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5), inset 0 0 80px rgba(124,43,31,0.15);
+    overflow: hidden;
+    min-height: 0;
+  }
+  .stage-map-wrap.aimable { cursor: crosshair; }
+  .stage-map-wrap svg { width: 100%; height: 100%; display: block; }
+  .stage-map-wrap .grain {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' /%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 0 0.3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n2)' /%3E%3C/svg%3E");
+    opacity: 0.4; mix-blend-mode: multiply; pointer-events: none;
+  }
+  .aim-prompt {
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(42,31,23,0.85);
+    color: var(--paper);
+    padding: 6px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    z-index: 8;
+  }
+  .crosshair {
+    position: absolute;
+    width: 60px; height: 60px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .crosshair.show { opacity: 1; }
+  .crosshair::before, .crosshair::after {
+    content: ''; position: absolute; background: var(--burgundy);
+  }
+  .crosshair::before {
+    left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%);
+  }
+  .crosshair::after {
+    top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%);
+  }
+  .crosshair-ring {
+    position: absolute; inset: 18px;
+    border: 1.5px solid var(--burgundy);
+    border-radius: 50%;
+  }
+  .charge-meter {
+    position: absolute;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    width: 65%;
+    height: 6px;
+    background: rgba(42,31,23,0.3);
+    border: 1px solid rgba(42,31,23,0.6);
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .charge-meter.show { opacity: 1; }
+  .charge-fill {
+    height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--gold), var(--orange), var(--burgundy));
+    transition: width 0.05s linear;
+  }
+  .dart {
+    position: absolute;
+    width: 54px; height: 58px;
+    pointer-events: none;
+    z-index: 10;
+    transform-origin: center bottom;
+    filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.35));
+  }
+  .stage-bottom {
+    flex: 0 0 auto;
+    padding: 12px 18px 24px;
+    text-align: center;
+    background: linear-gradient(to top, rgba(26,20,16,1) 30%, transparent);
+  }
+  .stage-caption {
+    font-family: 'Abril Fatface', serif;
+    font-size: 20px;
+    color: var(--orange);
+    min-height: 26px;
+  }
+
+  /* ============ RESULTS (TIKTOK-STYLE VERTICAL CARDS) ============ */
+  #result {
+    position: fixed;
+    inset: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--bg);
+    z-index: 110;
+    display: none;
+    flex-direction: column;
+  }
+  #result.show { display: flex; }
+  .result-top {
+    padding: 14px 18px;
+    text-align: center;
+    border-bottom: 2px dashed rgba(244,234,213,0.15);
+    flex-shrink: 0;
+  }
+  .result-top h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.04em;
+    color: var(--cream);
+  }
+  .result-top .sub {
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+  .result-pager {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .result-pager .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(244,234,213,0.25);
+  }
+  .result-pager .dot.active { background: var(--orange); }
+
+  .cards-stack {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+  .cards-stack::-webkit-scrollbar { display: none; }
+
+  .result-card {
+    min-height: 100%;
+    padding: 20px 16px 30px;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card-paper {
+    background: var(--paper);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    box-shadow: 8px 8px 0 var(--burgundy);
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transform: rotate(-0.5deg);
+  }
+  .card-paper.r2 { transform: rotate(0.5deg); }
+  .card-number {
+    position: absolute;
+    top: -14px; left: 18px;
+    background: var(--orange);
+    color: var(--ink);
+    padding: 4px 12px;
+    font-family: 'Abril Fatface', serif;
+    font-size: 16px;
+    border: 2px solid var(--ink);
+    z-index: 3;
+  }
+  .card-stamp {
+    position: absolute;
+    top: -12px; right: 14px;
+    width: 90px;
+    transform: rotate(8deg);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .card-stamp img { width: 100%; display: block; }
+  .card-hank {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    position: absolute;
+    bottom: -20px; right: 16px;
+    z-index: 3;
+    box-shadow: 4px 4px 0 var(--burgundy);
+    overflow: hidden;
+    background: var(--paper);
+  }
+  .card-hank img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  .card-img {
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: var(--cream);
+    border-bottom: 2px dashed rgba(42,31,23,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  .card-img img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .card-img-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(236,217,176,0.85);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--burgundy);
+    text-transform: uppercase;
+  }
+  .card-content {
+    padding: 16px 18px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .ticket-label {
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: var(--burgundy);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .card-state {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--rust);
+    letter-spacing: 0.2em;
+  }
+  .card-name {
+    font-family: 'Abril Fatface', serif;
+    font-size: 28px;
+    line-height: 1.0;
+    margin: 4px 0;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    padding-right: 90px;
+  }
+  .card-cat {
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--burgundy);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .card-why-label {
+    font-size: 8px;
+    letter-spacing: 0.3em;
+    color: var(--rust);
+    text-transform: uppercase;
+    margin: 14px 0 6px;
+  }
+  .card-why {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--ink);
+    flex: 1;
+  }
+  .card-foot {
+    margin-top: 14px;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .card-foot button {
+    flex: 1;
+    min-width: 90px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 9px 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .card-foot button.primary { background: var(--orange); color: var(--ink); }
+
+  /* RESULT BOTTOM BAR */
+  .result-bottom {
+    padding: 12px 16px 16px;
+    background: var(--bg);
+    flex-shrink: 0;
+    border-top: 2px dashed rgba(244,234,213,0.15);
+    display: flex;
+    gap: 8px;
+  }
+  .result-bottom button {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 11px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .result-bottom button.primary { background: var(--orange); color: var(--ink); border-color: var(--orange); }
+
+  /* ANIMATIONS */
+  @keyframes dartFly {
+    0%   { transform: translate(-50%, -320%) scale(2.6) rotate(-28deg); opacity: 0; }
+    15%  { opacity: 1; }
+    50%  { transform: translate(-50%, -180%) scale(1.8) rotate(-12deg); }
+    80%  { transform: translate(-50%, -92%) scale(1.18) rotate(3deg); }
+    100% { transform: translate(-50%, -85%) scale(1) rotate(0deg); opacity: 1; }
+  }
+  .dart.flying { animation: dartFly 0.95s cubic-bezier(0.18, 0.7, 0.25, 1) forwards; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-2px); }
+    40%, 80% { transform: translateX(2px); }
+  }
+  .stage-map-wrap.hit { animation: shake 0.3s; }
+  .hit-state {
+    fill: var(--orange) !important;
+    transition: fill 0.3s;
+    filter: drop-shadow(0 0 8px rgba(232,146,75,0.6));
+  }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 20px 20px 30px;
+    font-size: 9px;
+    color: rgba(244,234,213,0.3);
+    letter-spacing: 0.2em;
+  }
+
+  /* SHARE OVERLAY */
+  #sharePreview {
+    position: fixed;
+    inset: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    z-index: 120;
+    background: rgba(26,20,16,0.96);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 20px;
+  }
+  #sharePreview.show { display: flex; }
+  #sharePreview canvas {
+    max-width: 90vw;
+    max-height: 70vh;
+    border: 4px solid var(--ink);
+    box-shadow: 8px 8px 0 var(--burgundy);
+  }
+  .share-actions {
+    display: flex; gap: 8px; margin-top: 16px;
+  }
+  .share-actions button {
+    background: var(--orange); color: var(--ink); border: none;
+    padding: 12px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; cursor: pointer;
+  }
+  .share-actions button.secondary {
+    background: transparent; color: var(--cream); border: 1px solid rgba(244,234,213,0.3);
+  }
+
+  /* ============ DOC HANK SPEECH BUBBLES ============ */
+
+  /* Main-screen idle bubble (drops down from top-bar) */
+  .hank-idle-bubble {
+    position: sticky;
+    top: 72px;
+    z-index: 40;
+    margin: 0 14px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--burgundy);
+    padding: 10px 14px 10px 56px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.3;
+    transform: translateY(-30px) scale(0.92);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.22, 0.9, 0.3, 1);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .hank-idle-bubble.show {
+    transform: translateY(8px) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .hank-idle-bubble::before {
+    /* the little tail pointing up to the top-bar Hank icon */
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 18px;
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 10px solid var(--ink);
+  }
+  .hank-idle-bubble::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: 20px;
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid var(--paper);
+  }
+  .hank-idle-bubble .hank-mini {
+    position: absolute;
+    left: 8px; top: 50%;
+    transform: translateY(-50%);
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    overflow: hidden;
+    background: var(--bg-light);
+  }
+  .hank-idle-bubble .hank-mini img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center top;
+  }
+  .hank-idle-bubble .close-x {
+    position: absolute;
+    top: 4px; right: 6px;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-family: 'DM Mono', monospace;
+    opacity: 0.5;
+  }
+
+  /* Stage caption upgrade — Hank-styled */
+  .stage-caption.hank {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--cream);
+    letter-spacing: 0;
+  }
+  .stage-caption.hank::before {
+    content: '— ';
+    color: var(--orange);
+  }
+
+  /* Result card Hank speech (below the round Hank icon) */
+  .card-hank-quote {
+    position: absolute;
+    bottom: -68px;
+    right: 8px;
+    max-width: 220px;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 8px 12px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 12px;
+    line-height: 1.3;
+    border: 2px solid var(--orange);
+    box-shadow: 3px 3px 0 var(--burgundy);
+    z-index: 4;
+    transform: rotate(-1deg);
+  }
+  .card-hank-quote::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: 22px;
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 9px solid var(--orange);
+  }
+  .card-hank-quote::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    right: 24px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 6px solid var(--ink);
+  }
+  /* Adjust result card to make room for the speech bubble below */
+  .result-card { padding-bottom: 80px; }
+
+  /* TTS toggle button (sits next to audio toggle) */
+  .tts-toggle {
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 6px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .tts-toggle.on { color: var(--orange); border-color: var(--orange); }
+
+  /* ============ THROW WIND-UP SCENE ============ */
+  #throwScene {
+    position: fixed;
+    inset: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    z-index: 105;
+    background: #000;
+    display: none;
+    overflow: hidden;
+  }
+  #throwScene.show { display: block; }
+  .throw-scene-img {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .throw-scene-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    display: block;
+  }
+  /* Speed lines radiating from the throwing arm (upper-right area) — bolder now */
+  .throw-scene-lines {
+    position: absolute;
+    inset: -20%;
+    background:
+      repeating-conic-gradient(
+        from 0deg at 70% 40%,
+        rgba(26,20,16,0) 0deg,
+        rgba(26,20,16,0) 2.2deg,
+        rgba(26,20,16,0.55) 2.6deg,
+        rgba(26,20,16,0) 3deg
+      );
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  /* Vignette to pull the eye to center and add drama */
+  .throw-scene-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 70% 40%, transparent 25%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.85) 100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Full-screen darkness punch for the "release" impact (works on bright images) */
+  .throw-scene-flash {
+    position: absolute;
+    inset: 0;
+    background: #1a1410;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Animation sequence when .play is added */
+  @keyframes throwZoom {
+    0%   { transform: scale(1.05); filter: brightness(0.7) contrast(1.05); }
+    45%  { transform: scale(1.12); filter: brightness(1.0) contrast(1.1); }
+    62%  { transform: scale(1.20); filter: brightness(1.15) contrast(1.2); }
+    70%  { transform: scale(1.16); filter: brightness(0.5) contrast(1.3); }
+    78%  { transform: scale(1.22); filter: brightness(1.1) contrast(1.1); }
+    100% { transform: scale(1.28); filter: brightness(1.0) contrast(1.05); }
+  }
+  @keyframes throwVignette {
+    0%   { opacity: 0.9; }
+    50%  { opacity: 0.4; }
+    65%  { opacity: 0.2; }
+    100% { opacity: 0.7; }
+  }
+  @keyframes throwLines {
+    0%, 45% { opacity: 0; }
+    62% { opacity: 0.9; }
+    72% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes throwShake {
+    0%, 55% { transform: translate(0, 0); }
+    62% { transform: translate(-8px, 4px); }
+    66% { transform: translate(8px, -4px); }
+    70% { transform: translate(-10px, -2px); }
+    74% { transform: translate(7px, 5px); }
+    78% { transform: translate(-4px, -3px); }
+    84% { transform: translate(0, 0); }
+  }
+  /* Darkness punch: screen briefly dims hard right at release, then recovers */
+  @keyframes throwFlash {
+    0%, 66% { opacity: 0; }
+    69% { opacity: 0.85; }
+    74% { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  #throwScene.play .throw-scene-img { animation: throwZoom 1.4s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+  #throwScene.play { animation: throwShake 1.4s ease-out; }
+  #throwScene.play .throw-scene-lines { animation: throwLines 1.4s ease-out forwards; }
+  #throwScene.play .throw-scene-vignette { animation: throwVignette 1.4s ease-out forwards; }
+  #throwScene.play .throw-scene-flash { animation: throwFlash 1.4s ease-out forwards; }
+
+  /* Throw-anim toggle button */
+  .anim-toggle {
+    background: transparent;
+    border: 1px solid rgba(244,234,213,0.3);
+    color: var(--cream);
+    padding: 6px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .anim-toggle.on { color: var(--orange); border-color: var(--orange); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SPLASH SCREEN ============ -->
+  <div class="screen active" id="splash">
+    <div class="bg"><img src="assets/scene-bar-portrait.jpeg" alt=""/></div>
+    <div class="splash-content">
+      <div class="stamp-row"><span class="stamp">★ Est. 2026 ★ Prototype 004 ★</span></div>
+      <h1>Wander<span class="amp">·</span>dart</h1>
+      <div class="tag">Pin a Place · Hit the Road · USA</div>
+      <button class="start-btn" id="enterBtn">Step Inside</button>
+      <div class="hank-quote" id="splashQuote">"Pull up a stool, partner. Let's pick where you're headed."<br>— Doc Hank</div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP SCREEN ============ -->
+  <div class="screen" id="main">
+    <div class="top-bar">
+      <div class="hank-bubble"><img src="assets/hank-master.jpeg" alt="Doc Hank"/></div>
+      <div class="top-title">
+        <h1>Wander<span class="amp">·</span>dart</h1>
+        <div class="sub">Doc Hank's Dart Adventures</div>
+      </div>
+      <button class="anim-toggle on" id="animToggle" title="Throw animation">🎬</button>
+      <button class="tts-toggle on" id="ttsToggle" title="Hank's voice">💬</button>
+      <button class="audio-toggle" id="audioToggle">♪ On</button>
+    </div>
+
+    <!-- Doc Hank's idle thought bubble (appears periodically) -->
+    <div class="hank-idle-bubble" id="hankIdle">
+      <div class="hank-mini"><img src="assets/hank-master.jpeg" alt=""/></div>
+      <button class="close-x" id="hankIdleClose">×</button>
+      <span id="hankIdleText"></span>
+    </div>
+
+    <main>
+      <section data-num="01">
+        <div class="sec-title">Pick your flavor</div>
+        <div class="sec-sub">What kind of trip</div>
+        <div class="cats" id="cats"></div>
+      </section>
+
+      <section data-num="02">
+        <div class="sec-title">States in play</div>
+        <div class="sec-sub">Tap to include</div>
+        <div class="quick-row">
+          <button class="chip solid" data-region="all">All 50</button>
+          <button class="chip" data-region="west">West</button>
+          <button class="chip" data-region="mountain">Mtn</button>
+          <button class="chip" data-region="midwest">Midwest</button>
+          <button class="chip" data-region="south">South</button>
+          <button class="chip" data-region="northeast">NE</button>
+          <button class="chip" data-region="clear">Clear</button>
+        </div>
+        <div class="states" id="states"></div>
+      </section>
+
+      <section data-num="03">
+        <div class="sec-title">How far you going</div>
+        <div class="sec-sub">Optional distance filter</div>
+
+        <div class="dist-toggle-row">
+          <span class="dist-toggle-label">Filter by distance</span>
+          <button class="dist-switch" id="distSwitch" role="switch" aria-checked="false">
+            <span class="dist-switch-knob"></span>
+          </button>
+        </div>
+
+        <div class="dist-body" id="distBody">
+          <div class="dist-slider-head">
+            <span class="dist-slider-from">From your spot</span>
+            <span class="dist-slider-val" id="distVal">500 mi</span>
+          </div>
+          <input type="range" id="distSlider" class="dist-slider" min="100" max="2000" step="50" value="500" />
+          <div class="dist-origin-row">
+            <button class="dist-origin-btn" id="useLoc">★ Use my location</button>
+            <span class="dist-or">or</span>
+            <input id="zip" class="dist-zip" placeholder="ZIP" maxlength="5" inputmode="numeric" />
+          </div>
+          <div class="dist-note" id="distNote">Set an origin to filter by distance</div>
+        </div>
+      </section>
+
+      <section data-num="04">
+        <div class="sec-title">How many in the group</div>
+        <div class="sec-sub">One dart per person</div>
+        <div class="segments" id="dartCount">
+          <button class="seg active" data-n="1">1</button>
+          <button class="seg" data-n="2">2</button>
+          <button class="seg" data-n="3">3</button>
+          <button class="seg" data-n="4">4</button>
+          <button class="seg" data-n="5">5</button>
+        </div>
+        <div class="seg-note" id="segNote">1 dart · one destination</div>
+      </section>
+
+      <section data-num="05">
+        <div class="sec-title">How do you throw</div>
+        <div class="sec-sub">Trust fate or aim</div>
+        <div class="aim-row">
+          <button class="aim-opt active" data-aim="auto">
+            <span class="label-big">Kimagure</span>Random toss
+          </button>
+          <button class="aim-opt" data-aim="manual">
+            <span class="label-big">Take Aim</span>Tap &amp; hold
+          </button>
+        </div>
+      </section>
+
+      <section data-num="06" style="text-align:center;">
+        <div class="throw-zone">
+          <button class="throw-btn pulse" id="throwBtn">Throw the Dart</button>
+          <div class="pool-info" id="poolInfo">— places in the pool</div>
+        </div>
+      </section>
+
+      <section data-num="07">
+        <div class="sec-title">Trip log</div>
+        <div class="sec-sub">Every throw is a trip</div>
+        <div class="history-list" id="history"></div>
+      </section>
+    </main>
+
+    <footer>A throwback to the kimagure dart-trip — for the lower 48 (+2)</footer>
+  </div>
+
+  <!-- ============ STAGE (DART THROWING) ============ -->
+  <div id="stage">
+    <div class="stage-top">
+      <div class="stage-title" id="stageTitle">Throwing…</div>
+      <div class="stage-counter" id="stageCounter"></div>
+    </div>
+    <div class="stage-map-wrap" id="stageInner">
+      <div class="grain"></div>
+    </div>
+    <div class="stage-bottom">
+      <div class="stage-caption" id="stageCaption">Reading the dartboard…</div>
+    </div>
+  </div>
+
+  <!-- ============ THROW WIND-UP OVERLAY (scene-throwing) ============ -->
+  <div id="throwScene">
+    <div class="throw-scene-img">
+      <img src="assets/scene-throwing.jpeg" alt=""/>
+    </div>
+    <div class="throw-scene-lines"></div>
+    <div class="throw-scene-vignette"></div>
+    <div class="throw-scene-flash"></div>
+  </div>
+
+  <!-- ============ RESULT CARDS ============ -->
+  <div id="result">
+    <div class="result-top">
+      <h2 id="resultTitle">Your destination</h2>
+      <div class="sub" id="resultSub"></div>
+      <div class="result-pager" id="resultPager"></div>
+    </div>
+    <div class="cards-stack" id="cardsStack"></div>
+    <div class="result-bottom">
+      <button class="primary" id="throwAgain">Throw Again</button>
+      <button id="shareResult">Share</button>
+      <button id="closeResult">Done</button>
+    </div>
+  </div>
+
+  <!-- SHARE -->
+  <div id="sharePreview">
+    <canvas id="shareCanvas" width="1080" height="1350"></canvas>
+    <div class="share-actions">
+      <button id="downloadShare">Download</button>
+      <button class="secondary" id="closeShare">Close</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// === DATA ===
+const DESTINATIONS = [{"id": "np01", "name": "Yellowstone National Park", "state": "WY", "lat": 44.428, "lng": -110.588, "category": "national_parks", "why": "America's first national park — geysers, bison herds, and the surreal Grand Prismatic Spring."}, {"id": "np02", "name": "Grand Canyon National Park", "state": "AZ", "lat": 36.107, "lng": -112.113, "category": "national_parks", "why": "A mile-deep chasm carved over millions of years. Standing at the South Rim never gets old."}, {"id": "np03", "name": "Zion National Park", "state": "UT", "lat": 37.298, "lng": -113.026, "category": "national_parks", "why": "Towering red sandstone cliffs and the legendary Narrows slot canyon hike."}, {"id": "np04", "name": "Yosemite National Park", "state": "CA", "lat": 37.865, "lng": -119.538, "category": "national_parks", "why": "El Capitan, Half Dome, and waterfalls that thunder every spring."}, {"id": "np05", "name": "Acadia National Park", "state": "ME", "lat": 44.339, "lng": -68.273, "category": "national_parks", "why": "Where the Atlantic meets pink granite cliffs. Cadillac Mountain catches America's first sunrise."}, {"id": "np06", "name": "Great Smoky Mountains", "state": "TN", "lat": 35.611, "lng": -83.489, "category": "national_parks", "why": "Misty Appalachian ridges and the most-visited national park in the country."}, {"id": "np07", "name": "Glacier National Park", "state": "MT", "lat": 48.696, "lng": -113.718, "category": "national_parks", "why": "The Going-to-the-Sun Road delivers alpine drama you won't forget."}, {"id": "np08", "name": "Olympic National Park", "state": "WA", "lat": 47.802, "lng": -123.604, "category": "national_parks", "why": "Three ecosystems in one park: rainforest, glaciated peaks, and wild Pacific coast."}, {"id": "np09", "name": "Joshua Tree National Park", "state": "CA", "lat": 33.873, "lng": -115.901, "category": "national_parks", "why": "Surreal desert where two ecosystems collide. Sunset turns the rocks gold."}, {"id": "np10", "name": "Arches National Park", "state": "UT", "lat": 38.733, "lng": -109.592, "category": "national_parks", "why": "Over 2,000 natural stone arches — Delicate Arch is on Utah's license plate for a reason."}, {"id": "np11", "name": "Rocky Mountain National Park", "state": "CO", "lat": 40.343, "lng": -105.688, "category": "national_parks", "why": "Trail Ridge Road climbs above 12,000 feet through alpine tundra."}, {"id": "np12", "name": "Bryce Canyon National Park", "state": "UT", "lat": 37.593, "lng": -112.187, "category": "national_parks", "why": "Forests of orange hoodoos that look engineered by someone with a fever dream."}, {"id": "np13", "name": "Denali National Park", "state": "AK", "lat": 63.733, "lng": -148.913, "category": "national_parks", "why": "Six million acres around North America's tallest peak. Grizzlies, moose, and silence."}, {"id": "np14", "name": "Hawai'i Volcanoes National Park", "state": "HI", "lat": 19.426, "lng": -155.29, "category": "national_parks", "why": "Watch the earth being created. Kīlauea is one of the most active volcanoes on the planet."}, {"id": "np15", "name": "Everglades National Park", "state": "FL", "lat": 25.286, "lng": -80.899, "category": "national_parks", "why": "A river of grass with alligators, manatees, and 350 bird species."}, {"id": "np16", "name": "Crater Lake National Park", "state": "OR", "lat": 42.88, "lng": -122.169, "category": "national_parks", "why": "The deepest lake in the US, sitting inside a collapsed volcano. The blue is unreal."}, {"id": "np17", "name": "Big Bend National Park", "state": "TX", "lat": 29.27, "lng": -103.25, "category": "national_parks", "why": "Where the Rio Grande bends through the Chihuahuan Desert. Dark skies and complete remoteness."}, {"id": "np18", "name": "Mount Rainier National Park", "state": "WA", "lat": 46.879, "lng": -121.726, "category": "national_parks", "why": "A 14,411-foot active volcano blanketed in wildflower meadows every July."}, {"id": "np19", "name": "Sequoia National Park", "state": "CA", "lat": 36.486, "lng": -118.566, "category": "national_parks", "why": "Home to General Sherman — the largest tree on Earth by volume."}, {"id": "np20", "name": "Death Valley National Park", "state": "CA", "lat": 36.5, "lng": -117.08, "category": "national_parks", "why": "The hottest, driest, lowest point in North America. Beautiful in a brutal way."}, {"id": "bc01", "name": "Cannon Beach", "state": "OR", "lat": 45.89, "lng": -123.962, "category": "beaches", "why": "Haystack Rock rises 235 feet out of the surf. Foggy mornings, dramatic Pacific moods."}, {"id": "bc02", "name": "Siesta Beach", "state": "FL", "lat": 27.265, "lng": -82.553, "category": "beaches", "why": "99% pure quartz sand — stays cool even at noon. Repeatedly ranked #1 in America."}, {"id": "bc03", "name": "Coronado Beach", "state": "CA", "lat": 32.681, "lng": -117.183, "category": "beaches", "why": "Glittering mica-flecked sand backed by the Victorian Hotel del Coronado."}, {"id": "bc04", "name": "Cape Hatteras", "state": "NC", "lat": 35.25, "lng": -75.529, "category": "beaches", "why": "The Outer Banks at their wildest. Tallest brick lighthouse in America watches over you."}, {"id": "bc05", "name": "Ruby Beach", "state": "WA", "lat": 47.708, "lng": -124.413, "category": "beaches", "why": "Driftwood the size of cars, sea stacks, and tide pools full of starfish."}, {"id": "bc06", "name": "Ka'anapali Beach", "state": "HI", "lat": 20.929, "lng": -156.694, "category": "beaches", "why": "Three miles of soft gold sand on Maui's west shore. Sunset cliff divers off Black Rock."}, {"id": "bc07", "name": "Cape May", "state": "NJ", "lat": 38.935, "lng": -74.906, "category": "beaches", "why": "Victorian seaside town with beaches famous for 'Cape May diamonds' — polished quartz pebbles."}, {"id": "bc08", "name": "Padre Island National Seashore", "state": "TX", "lat": 27.42, "lng": -97.297, "category": "beaches", "why": "70 miles of undeveloped Gulf coast — the longest stretch of barrier island in the world."}, {"id": "bc09", "name": "Glass Beach", "state": "CA", "lat": 39.452, "lng": -123.815, "category": "beaches", "why": "A former dump where the ocean polished decades of trash into a sea-glass treasure."}, {"id": "bc10", "name": "Nauset Beach", "state": "MA", "lat": 41.785, "lng": -69.945, "category": "beaches", "why": "Classic Cape Cod: dune grass, salty wind, and clam shacks within walking distance."}, {"id": "bc11", "name": "Driftwood Beach", "state": "GA", "lat": 31.099, "lng": -81.412, "category": "beaches", "why": "A ghost forest of sun-bleached oaks lying on the sand. Otherworldly at low tide."}, {"id": "bc12", "name": "Lake Michigan Dunes", "state": "IN", "lat": 41.658, "lng": -87.057, "category": "beaches", "why": "Yes, the Midwest has beaches — and 200-foot sand dunes you can sled down."}, {"id": "bc13", "name": "Bandon Beach", "state": "OR", "lat": 43.115, "lng": -124.435, "category": "beaches", "why": "Face Rock and a graveyard of sea stacks at low tide. Storm-watching capital."}, {"id": "bc14", "name": "Hanalei Bay", "state": "HI", "lat": 22.211, "lng": -159.502, "category": "beaches", "why": "A two-mile crescent on Kauai's North Shore framed by green mountains and waterfalls."}, {"id": "bc15", "name": "Assateague Island", "state": "MD", "lat": 38.064, "lng": -75.215, "category": "beaches", "why": "Wild horses roam the dunes. They've been here since the 1600s."}, {"id": "lh01", "name": "Portland Head Light", "state": "ME", "lat": 43.623, "lng": -70.207, "category": "lighthouses", "why": "Commissioned by George Washington in 1791. America's lighthouse archetype."}, {"id": "lh02", "name": "Cape Hatteras Lighthouse", "state": "NC", "lat": 35.25, "lng": -75.529, "category": "lighthouses", "why": "Black-and-white candy-striped giant — tallest brick lighthouse in the United States."}, {"id": "lh03", "name": "Split Rock Lighthouse", "state": "MN", "lat": 47.2, "lng": -91.367, "category": "lighthouses", "why": "Perched 130 feet above Lake Superior on a sheer cliff. Lit each November 10th for the Edmund Fitzgerald."}, {"id": "lh04", "name": "Pigeon Point Light", "state": "CA", "lat": 37.182, "lng": -122.394, "category": "lighthouses", "why": "Tallest lighthouse on the West Coast. Pacific waves crash 115 feet below."}, {"id": "lh05", "name": "Heceta Head", "state": "OR", "lat": 44.137, "lng": -124.128, "category": "lighthouses", "why": "The most photographed lighthouse in America, with its first-order Fresnel still intact."}, {"id": "lh06", "name": "Bodie Island Light", "state": "NC", "lat": 35.819, "lng": -75.563, "category": "lighthouses", "why": "Horizontal black stripes mark this Outer Banks sentinel. Climb 214 steps for the view."}, {"id": "lh07", "name": "St. Augustine Lighthouse", "state": "FL", "lat": 29.885, "lng": -81.288, "category": "lighthouses", "why": "Black-and-white spiral pattern. Reputedly one of America's most haunted lighthouses."}, {"id": "lh08", "name": "Point Reyes Lighthouse", "state": "CA", "lat": 37.996, "lng": -123.024, "category": "lighthouses", "why": "Below 308 steps and the foggiest place on the West Coast. Gray whales pass right offshore."}, {"id": "lh09", "name": "Tybee Island Light", "state": "GA", "lat": 32.022, "lng": -80.846, "category": "lighthouses", "why": "One of America's oldest lighthouses — site established 1736. Black-and-white daymark visible 20 miles out."}, {"id": "lh10", "name": "Marblehead Light", "state": "OH", "lat": 41.535, "lng": -82.711, "category": "lighthouses", "why": "Oldest continuously operating lighthouse on the Great Lakes. Limestone tower from 1822."}, {"id": "lh11", "name": "Nubble Light", "state": "ME", "lat": 43.165, "lng": -70.591, "category": "lighthouses", "why": "On its own tiny island connected to York by a footbridge. A postcard come to life."}, {"id": "lh12", "name": "Block Island Southeast Light", "state": "RI", "lat": 41.153, "lng": -71.552, "category": "lighthouses", "why": "Brick Victorian tower moved back from a crumbling cliff in 1993. Now safe — for now."}, {"id": "ro01", "name": "Cadillac Ranch", "state": "TX", "lat": 35.187, "lng": -101.987, "category": "roadside", "why": "Ten Cadillacs buried nose-down in a field outside Amarillo. Bring spray paint."}, {"id": "ro02", "name": "Carhenge", "state": "NE", "lat": 42.142, "lng": -102.858, "category": "roadside", "why": "Stonehenge, but made of 39 vintage American cars, half-buried in the prairie."}, {"id": "ro03", "name": "World's Largest Ball of Twine", "state": "KS", "lat": 39.358, "lng": -98.43, "category": "roadside", "why": "Cawker City has been adding to it since 1953. Now over 8 million feet of twine."}, {"id": "ro04", "name": "The Mystery Spot", "state": "CA", "lat": 36.997, "lng": -122.014, "category": "roadside", "why": "A gravity hill near Santa Cruz where balls roll uphill and people stand at impossible angles."}, {"id": "ro05", "name": "Salvation Mountain", "state": "CA", "lat": 33.254, "lng": -115.473, "category": "roadside", "why": "A 50-foot-tall hand-painted desert sculpture covered in Bible verses and folk-art love."}, {"id": "ro06", "name": "The Corn Palace", "state": "SD", "lat": 43.717, "lng": -98.026, "category": "roadside", "why": "A Mitchell, SD arena re-muraled every year using thousands of ears of corn."}, {"id": "ro07", "name": "Lucy the Elephant", "state": "NJ", "lat": 39.351, "lng": -74.479, "category": "roadside", "why": "A six-story wooden elephant built in 1881 to sell real estate. Still standing on the Margate shore."}, {"id": "ro08", "name": "Wall Drug", "state": "SD", "lat": 43.992, "lng": -102.241, "category": "roadside", "why": "A tiny pharmacy that became an empire by offering free ice water to Mt. Rushmore tourists."}, {"id": "ro09", "name": "The Thing", "state": "AZ", "lat": 32.067, "lng": -109.628, "category": "roadside", "why": "Mystery roadside attraction off I-10. Billboards build the suspense for hundreds of miles."}, {"id": "ro10", "name": "Coral Castle", "state": "FL", "lat": 25.5, "lng": -80.444, "category": "roadside", "why": "A one-man monument carved from 1,100 tons of coral rock. Nobody knows quite how he did it."}, {"id": "ro11", "name": "Paul Bunyan and Babe", "state": "MN", "lat": 46.355, "lng": -94.196, "category": "roadside", "why": "The original talking statue from 1949. Bemidji has another. The legend has many homes."}, {"id": "ro12", "name": "World's Largest Thermometer", "state": "CA", "lat": 35.273, "lng": -116.06, "category": "roadside", "why": "134 feet tall — the temperature it once hit in Death Valley nearby."}, {"id": "ro13", "name": "International UFO Museum", "state": "NM", "lat": 33.394, "lng": -104.524, "category": "roadside", "why": "Roswell's shrine to the 1947 incident. Aliens on every street sign in town."}, {"id": "ro14", "name": "The Big Duck", "state": "NY", "lat": 40.911, "lng": -72.611, "category": "roadside", "why": "A 1931 duck-shaped duck shop on Long Island. The original 'duck' of architectural theory."}, {"id": "ro15", "name": "Spam Museum", "state": "MN", "lat": 43.673, "lng": -92.974, "category": "roadside", "why": "A free museum in Austin, MN celebrating canned pork. Surprisingly excellent."}, {"id": "ro16", "name": "Mystery Hole", "state": "WV", "lat": 38.072, "lng": -81.084, "category": "roadside", "why": "A hill where physics gets weird. The kind of place that survives because it's perfect kitsch."}, {"id": "ro17", "name": "Forevertron", "state": "WI", "lat": 43.412, "lng": -89.781, "category": "roadside", "why": "The world's largest scrap-metal sculpture — a Victorian-era space-launcher of one artist's dreams."}, {"id": "ro18", "name": "Big Texan Steak Ranch", "state": "TX", "lat": 35.201, "lng": -101.789, "category": "roadside", "why": "Free 72-oz steak if you eat it in an hour. Generations have failed. A few have won."}, {"id": "st01", "name": "Marfa", "state": "TX", "lat": 30.309, "lng": -104.022, "category": "small_towns", "why": "A high-desert art town with minimalist Donald Judd sculptures and unexplained 'Marfa Lights' at night."}, {"id": "st02", "name": "Sedona", "state": "AZ", "lat": 34.87, "lng": -111.76, "category": "small_towns", "why": "Red rock cathedrals and a downtown full of vortexes (and the people who feel them)."}, {"id": "st03", "name": "Stowe", "state": "VT", "lat": 44.465, "lng": -72.685, "category": "small_towns", "why": "Classic New England village with covered bridges, fall foliage, and the original Trapp Family Lodge."}, {"id": "st04", "name": "Telluride", "state": "CO", "lat": 37.937, "lng": -107.812, "category": "small_towns", "why": "A box canyon town surrounded by 13,000-foot peaks. Free gondola to the high ski village."}, {"id": "st05", "name": "Bisbee", "state": "AZ", "lat": 31.448, "lng": -109.928, "category": "small_towns", "why": "A former copper mining town reinvented as an artist colony, built vertically into a canyon."}, {"id": "st06", "name": "Bardstown", "state": "KY", "lat": 37.809, "lng": -85.467, "category": "small_towns", "why": "The Bourbon Capital of the World. Distilleries everywhere, plus the Stephen Foster amphitheater."}, {"id": "st07", "name": "Mendocino", "state": "CA", "lat": 39.305, "lng": -123.799, "category": "small_towns", "why": "Cliffs, redwoods, water towers, and Victorian houses. Looks like Maine accidentally drifted west."}, {"id": "st08", "name": "Galena", "state": "IL", "lat": 42.417, "lng": -90.428, "category": "small_towns", "why": "85% of buildings on the National Register. Ulysses S. Grant slept here — a lot."}, {"id": "st09", "name": "Beaufort", "state": "SC", "lat": 32.431, "lng": -80.669, "category": "small_towns", "why": "Spanish moss, antebellum mansions, and the slow rhythm of Lowcountry tides."}, {"id": "st10", "name": "Hood River", "state": "OR", "lat": 45.705, "lng": -121.521, "category": "small_towns", "why": "Windsurfing capital of the Pacific Northwest, with Mt. Hood looming over orchards and breweries."}, {"id": "st11", "name": "Eureka Springs", "state": "AR", "lat": 36.401, "lng": -93.738, "category": "small_towns", "why": "Ozark Victorian village built on impossible slopes. Every house has a different floor as its 'first'."}, {"id": "st12", "name": "Port Townsend", "state": "WA", "lat": 48.117, "lng": -122.76, "category": "small_towns", "why": "A Victorian seaport that time forgot. Wooden boat festival every September."}, {"id": "st13", "name": "Taos", "state": "NM", "lat": 36.407, "lng": -105.573, "category": "small_towns", "why": "1,000-year-old Pueblo, plus a town where D.H. Lawrence, Georgia O'Keeffe, and ski bums all coexist."}, {"id": "st14", "name": "Mystic", "state": "CT", "lat": 41.354, "lng": -71.967, "category": "small_towns", "why": "Whaling-era seaport with tall ships you can board. Pizza, too — there's that movie."}, {"id": "st15", "name": "Jerome", "state": "AZ", "lat": 34.749, "lng": -112.114, "category": "small_towns", "why": "Former mining town clinging to Cleopatra Hill. The 'wickedest town in the West' is now an art enclave."}, {"id": "st16", "name": "Ocracoke", "state": "NC", "lat": 35.114, "lng": -75.985, "category": "small_towns", "why": "Outer Banks village reachable only by ferry. Locals still speak a 17th-century brogue."}, {"id": "st17", "name": "Lanesboro", "state": "MN", "lat": 43.722, "lng": -91.978, "category": "small_towns", "why": "Bluff country river town that became one of the best small arts towns in America."}, {"id": "st18", "name": "Apalachicola", "state": "FL", "lat": 29.725, "lng": -84.985, "category": "small_towns", "why": "Florida Panhandle oyster town. The Forgotten Coast at its best — no high-rises, just shrimp boats."}, {"id": "ds01", "name": "Pacific Coast Highway", "state": "CA", "lat": 36.295, "lng": -121.834, "category": "scenic_drives", "why": "655 miles of California coast. Big Sur is the heart-stopping middle stretch."}, {"id": "ds02", "name": "Blue Ridge Parkway", "state": "NC", "lat": 36.108, "lng": -82.262, "category": "scenic_drives", "why": "469 miles along the Appalachian crest. No commercial traffic, no billboards — just ridgelines."}, {"id": "ds03", "name": "Going-to-the-Sun Road", "state": "MT", "lat": 48.696, "lng": -113.718, "category": "scenic_drives", "why": "50 miles through Glacier National Park, climbing over Logan Pass. Open only in summer."}, {"id": "ds04", "name": "Overseas Highway", "state": "FL", "lat": 24.722, "lng": -81.082, "category": "scenic_drives", "why": "113 miles across 42 bridges to Key West. The road that runs to the end of America."}, {"id": "ds05", "name": "Beartooth Highway", "state": "MT", "lat": 45.03, "lng": -109.476, "category": "scenic_drives", "why": "68 alpine miles peaking at 10,947 feet. Charles Kuralt called it 'the most beautiful drive in America'."}, {"id": "ds06", "name": "Route 66 — Arizona stretch", "state": "AZ", "lat": 35.252, "lng": -113.04, "category": "scenic_drives", "why": "The longest unbroken stretch of the Mother Road. Seligman, Hackberry, Oatman, donkeys included."}, {"id": "ds07", "name": "Hana Highway", "state": "HI", "lat": 20.792, "lng": -156.012, "category": "scenic_drives", "why": "64 miles, 620 curves, 59 bridges along Maui's wettest coast. Waterfalls every few minutes."}, {"id": "ds08", "name": "Highway 12 Scenic Byway", "state": "UT", "lat": 37.87, "lng": -111.418, "category": "scenic_drives", "why": "Slickrock, hoodoos, aspen forests at 9,200 feet, and a 'hogback' ridge where the road has cliffs on both sides."}, {"id": "ds09", "name": "Skyline Drive", "state": "VA", "lat": 38.587, "lng": -78.387, "category": "scenic_drives", "why": "105 miles down the spine of Shenandoah National Park. 75 overlooks of the Blue Ridge."}, {"id": "ds10", "name": "Million Dollar Highway", "state": "CO", "lat": 37.834, "lng": -107.685, "category": "scenic_drives", "why": "US 550 through Colorado's San Juans. No guardrails, 11,000-foot passes, full white-knuckle."}, {"id": "ds11", "name": "Natchez Trace Parkway", "state": "MS", "lat": 33.527, "lng": -89.005, "category": "scenic_drives", "why": "444 miles tracing an ancient trail from Nashville to Natchez. Cypress swamps, Civil War sites."}, {"id": "ds12", "name": "Acadia Park Loop", "state": "ME", "lat": 44.339, "lng": -68.273, "category": "scenic_drives", "why": "27 miles of Atlantic coast, granite, and birch forest. Sand Beach to Otter Cliffs to Jordan Pond."}, {"id": "ds13", "name": "Trail Ridge Road", "state": "CO", "lat": 40.343, "lng": -105.688, "category": "scenic_drives", "why": "Highest continuously paved road in America. Eleven miles above tree line."}, {"id": "ds14", "name": "Kancamagus Highway", "state": "NH", "lat": 44.012, "lng": -71.38, "category": "scenic_drives", "why": "34 miles through the White Mountains. New England's leaf-peeping classic."}, {"id": "sk01", "name": "Cherry Springs State Park", "state": "PA", "lat": 41.663, "lng": -77.821, "category": "dark_sky", "why": "Gold-tier dark sky park in north-central Pennsylvania. The Milky Way casts shadows."}, {"id": "sk02", "name": "Natural Bridges National Monument", "state": "UT", "lat": 37.609, "lng": -110.012, "category": "dark_sky", "why": "The world's first International Dark Sky Park. Three stone arches under 15,000 visible stars."}, {"id": "sk03", "name": "Big Bend National Park", "state": "TX", "lat": 29.27, "lng": -103.25, "category": "dark_sky", "why": "The least light-polluted national park in the lower 48. Stars to the horizon."}, {"id": "sk04", "name": "Death Valley National Park", "state": "CA", "lat": 36.5, "lng": -117.08, "category": "dark_sky", "why": "Gold-tier dark sky. Bortle Class 1 — about as dark as it gets in North America."}, {"id": "sk05", "name": "Great Basin National Park", "state": "NV", "lat": 38.983, "lng": -114.301, "category": "dark_sky", "why": "Annual astronomy festival. Bristlecone pines older than civilization stand under the Milky Way."}, {"id": "sk06", "name": "Headlands International Dark Sky Park", "state": "MI", "lat": 45.78, "lng": -84.78, "category": "dark_sky", "why": "600 acres on Lake Michigan's shore — northern lights regularly dance overhead."}, {"id": "sk07", "name": "Cosmic Campground", "state": "NM", "lat": 33.479, "lng": -108.901, "category": "dark_sky", "why": "First International Dark Sky Sanctuary in the northern hemisphere. Gila National Forest."}, {"id": "sk08", "name": "Mauna Kea Visitor Center", "state": "HI", "lat": 19.762, "lng": -155.456, "category": "dark_sky", "why": "9,200 ft up Hawaii's tallest volcano. Where the world's biggest telescopes go to look."}, {"id": "sk09", "name": "Bryce Canyon Astronomy", "state": "UT", "lat": 37.593, "lng": -112.187, "category": "dark_sky", "why": "Hoodoos by day, 7,500 stars by night. The annual astronomy festival is legendary."}, {"id": "sk10", "name": "Joshua Tree Dark Sky", "state": "CA", "lat": 33.873, "lng": -115.901, "category": "dark_sky", "why": "Two hours from LA but the sky is suddenly black. Yucca silhouettes against the galaxy."}, {"id": "sk11", "name": "Voyageurs National Park", "state": "MN", "lat": 48.484, "lng": -92.838, "category": "dark_sky", "why": "Northern Minnesota lake country. Aurora borealis on clear winter nights."}, {"id": "sk12", "name": "Antelope Island", "state": "UT", "lat": 40.957, "lng": -112.215, "category": "dark_sky", "why": "Bison silhouettes against the Milky Way over the Great Salt Lake."}, {"id": "dn01", "name": "Mickey's Diner", "state": "MN", "lat": 44.948, "lng": -93.099, "category": "diners", "why": "A 1937 dining car welded to the sidewalk in downtown St. Paul. National Historic Register."}, {"id": "dn02", "name": "Frontier Diner", "state": "NY", "lat": 40.789, "lng": -73.952, "category": "diners", "why": "Classic NYC diner near the Upper East Side — open 24 hours since you were born."}, {"id": "dn03", "name": "Pat's King of Steaks", "state": "PA", "lat": 39.934, "lng": -75.158, "category": "diners", "why": "Birthplace of the Philly cheesesteak since 1930. Open 24/7. Order 'wit' or 'witout'."}, {"id": "dn04", "name": "Tick Tock Diner", "state": "NJ", "lat": 40.875, "lng": -74.155, "category": "diners", "why": "Stainless-steel cathedral of breakfast on Route 3. 'Eat Heavy' is literally on the menu."}, {"id": "dn05", "name": "Mel's Drive-In", "state": "CA", "lat": 37.802, "lng": -122.422, "category": "diners", "why": "San Francisco's original 1947 drive-in. Yes, that one from American Graffiti."}, {"id": "dn06", "name": "The Varsity", "state": "GA", "lat": 33.772, "lng": -84.388, "category": "diners", "why": "World's largest drive-in restaurant. 'What'll ya have?' shouted at Georgia Tech students since 1928."}, {"id": "dn07", "name": "Pann's Restaurant", "state": "CA", "lat": 33.964, "lng": -118.371, "category": "diners", "why": "Pure 1958 Googie architecture in LA. Boomerangs, atomic angles, and great pancakes."}, {"id": "dn08", "name": "Lou Mitchell's", "state": "IL", "lat": 41.876, "lng": -87.642, "category": "diners", "why": "The unofficial start of Route 66 in Chicago. Donut holes while you wait, since 1923."}, {"id": "dn09", "name": "Waffle House #1", "state": "GA", "lat": 33.776, "lng": -84.296, "category": "diners", "why": "The original 1955 Waffle House, now a museum. Every other Waffle House descends from this one."}, {"id": "dn10", "name": "Beacon Drive-In", "state": "SC", "lat": 34.957, "lng": -81.951, "category": "diners", "why": "Spartanburg legend. Order with chili and onion rings — they'll yell 'walking!'."}, {"id": "dn11", "name": "Modern Diner", "state": "RI", "lat": 41.879, "lng": -71.379, "category": "diners", "why": "A 1941 Sterling Streamliner — only two left in the country. First diner on the National Register."}, {"id": "dn12", "name": "11th Street Diner", "state": "FL", "lat": 25.781, "lng": -80.132, "category": "diners", "why": "A 1948 Paramount dining car shipped to Miami Beach. Open 24 hours in South Beach."}, {"id": "dn13", "name": "Empire Diner", "state": "NY", "lat": 40.746, "lng": -74.005, "category": "diners", "why": "Art Deco icon of Chelsea since 1946. Featured in Manhattan, Home Alone 2, and countless album covers."}, {"id": "dn14", "name": "Phillips' Grocery", "state": "MS", "lat": 34.357, "lng": -89.519, "category": "diners", "why": "Holly Springs hamburger joint in a 1900 wooden building. Garden & Gun calls them America's best burger."}, {"id": "hs01", "name": "Hot Springs National Park", "state": "AR", "lat": 34.512, "lng": -93.054, "category": "hot_springs", "why": "The smallest US national park, set inside a Victorian bathhouse district. America's original spa town."}, {"id": "hs02", "name": "Strawberry Park Hot Springs", "state": "CO", "lat": 40.541, "lng": -106.815, "category": "hot_springs", "why": "Stone-lined pools in the Routt National Forest. Steam rises into snowy aspens in winter."}, {"id": "hs03", "name": "Travertine Hot Springs", "state": "CA", "lat": 38.247, "lng": -119.205, "category": "hot_springs", "why": "Free, primitive pools on a hillside above Bridgeport. Sierra peaks all around you."}, {"id": "hs04", "name": "Calistoga Hot Springs", "state": "CA", "lat": 38.578, "lng": -122.58, "category": "hot_springs", "why": "Napa Valley's geothermal soak town. Mud baths, mineral pools, and Old Faithful of California."}, {"id": "hs05", "name": "Glenwood Hot Springs", "state": "CO", "lat": 39.553, "lng": -107.327, "category": "hot_springs", "why": "The world's largest hot springs pool. 405 feet long, 90°F to 104°F year-round."}, {"id": "hs06", "name": "Conundrum Hot Springs", "state": "CO", "lat": 39.029, "lng": -106.91, "category": "hot_springs", "why": "Backcountry pools at 11,200 feet. 8 miles up the trail. Snow on the mountains, you in the water."}, {"id": "hs07", "name": "Chico Hot Springs", "state": "MT", "lat": 45.367, "lng": -110.704, "category": "hot_springs", "why": "Pray, MT — 1900 Victorian resort with mineral pools. The Paradise Valley wraps around you."}, {"id": "hs08", "name": "Olympic Hot Springs", "state": "WA", "lat": 47.974, "lng": -123.671, "category": "hot_springs", "why": "Wild pools in Olympic National Park, reached by an old road-turned-trail through rainforest."}, {"id": "hs09", "name": "Saratoga Hot Springs", "state": "WY", "lat": 41.452, "lng": -106.806, "category": "hot_springs", "why": "Free, town-owned pool on the North Platte. Locals soak through Wyoming blizzards."}, {"id": "hs10", "name": "Boiling River", "state": "WY", "lat": 44.989, "lng": -110.692, "category": "hot_springs", "why": "Yellowstone hot water meets the cold Gardner — find your temperature zone in the current."}, {"id": "hs11", "name": "Ojo Caliente", "state": "NM", "lat": 36.305, "lng": -106.052, "category": "hot_springs", "why": "Ancient Indigenous spring complex with four mineral types. Adobe everywhere."}, {"id": "hs12", "name": "Sykes Hot Springs", "state": "CA", "lat": 36.225, "lng": -121.749, "category": "hot_springs", "why": "10 miles into Big Sur's Ventana Wilderness. Soak after a hard hike, redwoods overhead."}, {"id": "hs13", "name": "Jemez Springs", "state": "NM", "lat": 35.77, "lng": -106.691, "category": "hot_springs", "why": "A historic mountain village built on hot water. Soda Dam, ruins, and red rock canyons."}, {"id": "hs14", "name": "Goldmyer Hot Springs", "state": "WA", "lat": 47.491, "lng": -121.388, "category": "hot_springs", "why": "Three stone tubs at the end of a 5-mile forest road, an hour from Seattle. Reservations only."}, {"id": "gt01", "name": "Bodie", "state": "CA", "lat": 38.213, "lng": -119.012, "category": "ghost_towns", "why": "Eastern Sierra gold-rush town frozen in 'arrested decay'. The state preserves it exactly as found in 1962."}, {"id": "gt02", "name": "Bannack", "state": "MT", "lat": 45.161, "lng": -112.998, "category": "ghost_towns", "why": "Montana's first territorial capital. Sixty buildings still stand, including a haunted hotel."}, {"id": "gt03", "name": "Calico", "state": "CA", "lat": 34.944, "lng": -116.864, "category": "ghost_towns", "why": "Mojave silver-mining town reborn as a Knott's roadside attraction. Half restored, half real ruin."}, {"id": "gt04", "name": "Rhyolite", "state": "NV", "lat": 36.903, "lng": -116.831, "category": "ghost_towns", "why": "Boom-and-bust gold town near Death Valley. The bottle house, a 1908 building made of 50,000 bottles."}, {"id": "gt05", "name": "Garnet", "state": "MT", "lat": 46.819, "lng": -113.341, "category": "ghost_towns", "why": "Montana's best-preserved ghost town — accessible only by gravel road. Step inside the saloon."}, {"id": "gt06", "name": "St. Elmo", "state": "CO", "lat": 38.703, "lng": -106.349, "category": "ghost_towns", "why": "Sawatch Range silver town at 10,000 feet. The post office still operates. Chipmunks now outnumber humans."}, {"id": "gt07", "name": "Terlingua", "state": "TX", "lat": 29.319, "lng": -103.617, "category": "ghost_towns", "why": "Quicksilver mining town near Big Bend. Half ghost, half artist colony, all chili cookoff."}, {"id": "gt08", "name": "Goldfield", "state": "NV", "lat": 37.708, "lng": -117.236, "category": "ghost_towns", "why": "Once Nevada's largest city (1907). Now the International Car Forest of the Last Church. Read that twice."}, {"id": "gt09", "name": "Kennecott", "state": "AK", "lat": 61.484, "lng": -142.886, "category": "ghost_towns", "why": "Wrangell-St. Elias copper mining complex. Red wooden buildings against blue glaciers."}, {"id": "gt10", "name": "Centralia", "state": "PA", "lat": 40.804, "lng": -76.342, "category": "ghost_towns", "why": "An underground coal fire has been burning since 1962. Steam rises through cracks in empty streets."}, {"id": "gt11", "name": "Thurmond", "state": "WV", "lat": 37.953, "lng": -81.077, "category": "ghost_towns", "why": "New River Gorge railroad town that the highways forgot. Population: 5. Still has a working depot."}, {"id": "gt12", "name": "Cahawba", "state": "AL", "lat": 32.319, "lng": -87.103, "category": "ghost_towns", "why": "Alabama's first state capital, abandoned to floods. Spanish moss now drapes Greek Revival ruins."}];
+
+const CATEGORIES = [
+  { id: 'national_parks', label: 'Nat\'l Parks', icon: '⛰' },
+  { id: 'beaches', label: 'Beaches', icon: '〜' },
+  { id: 'lighthouses', label: 'Lighthouses', icon: '☼' },
+  { id: 'roadside', label: 'Roadside', icon: '◉' },
+  { id: 'small_towns', label: 'Small Towns', icon: '⌂' },
+  { id: 'scenic_drives', label: 'Scenic Drives', icon: '➤' },
+  { id: 'dark_sky', label: 'Dark Sky', icon: '✦' },
+  { id: 'diners', label: 'Diners', icon: '☕' },
+  { id: 'hot_springs', label: 'Hot Springs', icon: '♨' },
+  { id: 'ghost_towns', label: 'Ghost Towns', icon: '✧' },
+];
+
+const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
+const REGIONS = {
+  west: ['CA','OR','WA','NV','HI','AK'],
+  mountain: ['MT','ID','WY','UT','CO','AZ','NM'],
+  midwest: ['ND','SD','NE','KS','MN','IA','MO','WI','IL','MI','IN','OH'],
+  south: ['TX','OK','AR','LA','MS','AL','TN','KY','WV','VA','NC','SC','GA','FL'],
+  northeast: ['PA','NY','NJ','CT','RI','MA','VT','NH','ME','DE','MD'],
+};
+
+// Map result → Hank emotion image filename
+const HANK_EXPRESSIONS = ['ecstatic', 'smug', 'suspicious', 'disappointed', 'mid-burp', 'exhausted'];
+const STAMPS = ['approved', 'bullseye', 'road-trip', 'destination', 'certified', 'pin-and-go', 'usa', 'admit-one', 'gold-star'];
+
+// === DOC HANK SAYS ===
+// Each line: { t: text, m: mood (matches HANK_EXPRESSIONS) }
+const HANK_LINES = {
+  splash: [
+    { t: "Pull up a stool, partner. Let's pick where yer headed.", m: "smug" },
+    { t: "Map's on the wall. Darts are on the counter. Let's go.", m: "ecstatic" },
+    { t: "Forty years I been pickin' trips this way. Hasn't failed yet.", m: "smug" },
+    { t: "No GPS. No planner. Just a dart and the road.", m: "ecstatic" },
+    { t: "Step inside. Coffee's stale but the company's worse.", m: "exhausted" },
+  ],
+  idle: [
+    { t: "Still here? The map ain't gonna pick itself.", m: "suspicious" },
+    { t: "*sips lukewarm coffee*", m: "exhausted" },
+    { t: "Y'know, I drove to Nebraska once on a dare. Don't recommend it. Don't NOT recommend it.", m: "smug" },
+    { t: "Bar's open. Throw a dart already.", m: "disappointed" },
+    { t: "I'm not judgin'. Much.", m: "smug" },
+    { t: "These stools have heard things, partner. Things.", m: "suspicious" },
+    { t: "Pick a category. The countryside's waitin'.", m: "ecstatic" },
+    { t: "Forty years behind this bar and I still ain't seen it all.", m: "smug" },
+    { t: "*scratches mustache thoughtfully*", m: "suspicious" },
+    { t: "Whatever yer overthinkin', stop.", m: "disappointed" },
+    { t: "Two-day-old chili in the back if yer hungry. Eat at yer own risk.", m: "mid-burp" },
+    { t: "Map's been waitin' all day. So have I.", m: "exhausted" },
+    { t: "Trust the dart. Dart never lies.", m: "smug" },
+    { t: "Used to know a fella who planned every trip down to the minute. Miserable son of a gun.", m: "disappointed" },
+    { t: "Don't make me come over there.", m: "suspicious" },
+    { t: "Some folks scroll. Some folks GO. Which one are ya?", m: "smug" },
+  ],
+  pre_throw: [
+    { t: "Alright partner, let's see where the universe wants ya.", m: "ecstatic" },
+    { t: "Don't overthink it. The dart knows.", m: "smug" },
+    { t: "Last time someone hesitated this long, they ended up in Toledo. Ya been warned.", m: "suspicious" },
+    { t: "Steady arm. Empty head. Full tank.", m: "smug" },
+    { t: "Ya sure ya got the time off work for this?", m: "suspicious" },
+    { t: "Let 'er rip.", m: "ecstatic" },
+    { t: "Crack yer knuckles. Look the part.", m: "smug" },
+  ],
+  aiming: [
+    { t: "Take yer time. Map ain't goin' nowhere.", m: "exhausted" },
+    { t: "Steady now... or don't. I've seen drunks aim better.", m: "smug" },
+    { t: "I once threw a dart that landed in my own foot. True story.", m: "disappointed" },
+    { t: "Whole country in front of ya and yer stallin'.", m: "suspicious" },
+    { t: "Breathe in... breathe out... let 'er fly.", m: "ecstatic" },
+    { t: "Lookin' a little shaky there, partner.", m: "smug" },
+  ],
+  mid_throw: [
+    { t: "And it's away!", m: "ecstatic" },
+    { t: "Fly, ya beautiful thing.", m: "ecstatic" },
+    { t: "Here we go here we go here we go!", m: "ecstatic" },
+    { t: "Hold yer breath.", m: "suspicious" },
+  ],
+  hit_national_parks: [
+    { t: "Now THAT'S a real American dream, partner.", m: "ecstatic" },
+    { t: "Pack the bear spray. Don't be a statistic.", m: "suspicious" },
+    { t: "Rangers'll point at things. Pretend to be impressed.", m: "smug" },
+    { t: "Bring layers. Park weather lies to ya.", m: "smug" },
+  ],
+  hit_beaches: [
+    { t: "Pack sunscreen. SPF whatever-they-make-now.", m: "smug" },
+    { t: "Sand'll get in places sand shouldn't be.", m: "mid-burp" },
+    { t: "Put yer phone down for once. Watch the water.", m: "ecstatic" },
+  ],
+  hit_lighthouses: [
+    { t: "Climb every step. Then complain about every step.", m: "exhausted" },
+    { t: "Lighthouse keepers were a lonely bunch. Now ya know why.", m: "disappointed" },
+    { t: "Sunset light. Camera ready. Don't blow it.", m: "ecstatic" },
+  ],
+  hit_roadside: [
+    { t: "Gas station coffee and questionable decisions. My kinda trip.", m: "smug" },
+    { t: "World's largest somethin'. Worth two photos, tops.", m: "smug" },
+    { t: "Bring quarters. Always bring quarters.", m: "suspicious" },
+    { t: "If it looks weird in the photos, it'll look weirder in person.", m: "mid-burp" },
+  ],
+  hit_small_towns: [
+    { t: "Talk to the old folks at the diner. They know everything.", m: "ecstatic" },
+    { t: "One stoplight. One coffee shop. One chance to slow the heck down.", m: "smug" },
+    { t: "Pop into the hardware store. Trust me.", m: "suspicious" },
+  ],
+  hit_scenic_drives: [
+    { t: "Top down. Radio up. Phone in the glove box.", m: "ecstatic" },
+    { t: "Fill the tank BEFORE ya start. Rookie mistake out there.", m: "suspicious" },
+    { t: "Take the pullouts. All of 'em. Yer not in a hurry.", m: "smug" },
+  ],
+  hit_dark_sky: [
+    { t: "Look up. Try not to feel insignificant.", m: "smug" },
+    { t: "Red flashlight only. Don't be the guy that ruins it for everyone.", m: "disappointed" },
+    { t: "The Milky Way's free. The drive ain't. Worth it.", m: "ecstatic" },
+  ],
+  hit_diners: [
+    { t: "Order the pie. ALWAYS order the pie.", m: "ecstatic" },
+    { t: "Hope yer cholesterol's prepared.", m: "mid-burp" },
+    { t: "Tip in cash. The waitresses earned it.", m: "smug" },
+    { t: "Coffee'll be terrible. That's how ya know it's real.", m: "smug" },
+  ],
+  hit_hot_springs: [
+    { t: "Soak it in. Ya earned it. Probably.", m: "ecstatic" },
+    { t: "Don't ask what the smell is. Just enjoy.", m: "mid-burp" },
+    { t: "Hydrate before. Hydrate after. Don't be a fool.", m: "suspicious" },
+  ],
+  hit_ghost_towns: [
+    { t: "Watch yer back out there. The dead got opinions.", m: "suspicious" },
+    { t: "If ya hear footsteps and yer alone... walk faster.", m: "suspicious" },
+    { t: "Take pictures. Take nothin' else.", m: "disappointed" },
+  ],
+  multi_2: [
+    { t: "Two darts. Two fools. Could be worse.", m: "smug" },
+    { t: "Buddy trip. Don't kill each other by day three.", m: "suspicious" },
+  ],
+  multi_3: [
+    { t: "Three darts. A pack. Hope y'all get along.", m: "suspicious" },
+  ],
+  multi_4: [
+    { t: "Four darts. A road trip squad. May god have mercy.", m: "disappointed" },
+  ],
+  multi_5: [
+    { t: "Y'all crazy. Pack the truck.", m: "ecstatic" },
+    { t: "Five darts. Five fools. I love it.", m: "ecstatic" },
+  ],
+};
+
+function hankPick(key) {
+  const list = HANK_LINES[key];
+  if (!list || !list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+function hankPickHit(category) {
+  return hankPick('hit_' + category) || hankPick('hit_roadside');
+}
+
+// === STATE ===
+const state = {
+  selectedCats: new Set(CATEGORIES.map(c => c.id)),
+  selectedStates: new Set(STATES),
+  maxDistance: 0,
+  originLat: null,
+  originLng: null,
+  dartCount: 1,
+  aimMode: 'auto',
+  history: JSON.parse(localStorage.getItem('wd_history') || '[]'),
+  lastResults: [],
+  soundOn: localStorage.getItem('wd_sound') !== 'off',
+  ttsOn: localStorage.getItem('wd_tts') !== 'off',
+  throwAnimOn: localStorage.getItem('wd_throwanim') !== 'off',
+  imageCache: JSON.parse(localStorage.getItem('wd_img_cache') || '{}'),
+};
+
+// === AUDIO ===
+let audioCtx = null;
+function getAudio() {
+  if (!state.soundOn) return null;
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; } }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playWhoosh() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator(), gain = ctx.createGain(), filt = ctx.createBiquadFilter();
+  filt.type = 'bandpass';
+  filt.frequency.setValueAtTime(800, now);
+  filt.frequency.exponentialRampToValueAtTime(200, now + 0.5);
+  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(60, now);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.12, now + 0.1);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+  osc.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+  osc.start(now); osc.stop(now + 0.5);
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random()*2-1) * Math.pow(1 - i/data.length, 2);
+  const noise = ctx.createBufferSource(); noise.buffer = buf;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.07, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  noise.connect(ng); ng.connect(ctx.destination); noise.start(now);
+}
+function playThunk() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+  gain.gain.setValueAtTime(0.35, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+  osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.2);
+  const buf = ctx.createBuffer(1, 800, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+  const click = ctx.createBufferSource(); click.buffer = buf;
+  const cg = ctx.createGain();
+  cg.gain.setValueAtTime(0.25, now);
+  cg.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+  click.connect(cg); cg.connect(ctx.destination); click.start(now);
+}
+function playDing() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + i*0.05);
+    gain.gain.setValueAtTime(0, now + i*0.05);
+    gain.gain.linearRampToValueAtTime(0.1, now + i*0.05 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i*0.05 + 0.5);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now + i*0.05); osc.stop(now + i*0.05 + 0.5);
+  });
+}
+function playClick() {
+  const ctx = getAudio(); if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = 'square'; osc.frequency.setValueAtTime(1200, now);
+  gain.gain.setValueAtTime(0.04, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+  osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.03);
+}
+
+// === HANK VOICE (TTS) ===
+// Speaks a Hank line out loud. Browser-native, no network.
+let hankVoice = null;
+function pickHankVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  // Prefer English male-leaning voices
+  const prefer = ['Daniel', 'Fred', 'Alex', 'Aaron', 'Arthur', 'Bruce', 'Ralph'];
+  for (const name of prefer) {
+    const v = voices.find(v => v.name.includes(name));
+    if (v) return v;
+  }
+  // Otherwise any en-US voice
+  return voices.find(v => v.lang && v.lang.startsWith('en-US')) ||
+         voices.find(v => v.lang && v.lang.startsWith('en')) ||
+         voices[0];
+}
+if ('speechSynthesis' in window) {
+  speechSynthesis.onvoiceschanged = () => { hankVoice = pickHankVoice(); };
+  hankVoice = pickHankVoice();
+}
+function hankSpeak(text) {
+  if (!state.ttsOn || !('speechSynthesis' in window)) return;
+  // Strip stage-direction asterisks like "*sips coffee*" — TTS shouldn't read those literally
+  const clean = text.replace(/\*[^*]+\*/g, '').trim();
+  if (!clean) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    if (hankVoice) u.voice = hankVoice;
+    u.rate = 0.92;
+    u.pitch = 0.78;  // a touch lower than default
+    u.volume = 0.85;
+    speechSynthesis.speak(u);
+  } catch(e) { /* silent fail */ }
+}
+function hankShutUp() {
+  if ('speechSynthesis' in window) {
+    try { speechSynthesis.cancel(); } catch(e) {}
+  }
+}
+
+// === HANK IDLE BUBBLE (main screen) ===
+let hankIdleTimer = null;
+let hankIdleHideTimer = null;
+let hankIdleSeenAt = 0;
+
+function showHankIdle(line) {
+  const bubble = document.getElementById('hankIdle');
+  const txt = document.getElementById('hankIdleText');
+  if (!bubble || !txt) return;
+  if (!line) line = hankPick('idle');
+  if (!line) return;
+  // Update the mini-portrait to match the mood
+  const mini = bubble.querySelector('.hank-mini img');
+  if (mini && line.m) mini.src = `assets/hank-${line.m}.jpg`;
+  txt.textContent = line.t;
+  bubble.classList.add('show');
+  hankSpeak(line.t);
+  hankIdleSeenAt = Date.now();
+  clearTimeout(hankIdleHideTimer);
+  hankIdleHideTimer = setTimeout(hideHankIdle, 6500);
+}
+function hideHankIdle() {
+  const bubble = document.getElementById('hankIdle');
+  if (bubble) bubble.classList.remove('show');
+  hankShutUp();
+}
+function startHankIdleLoop() {
+  stopHankIdleLoop();
+  const scheduleNext = () => {
+    // Random interval between 22 and 45 seconds
+    const wait = 22000 + Math.random() * 23000;
+    hankIdleTimer = setTimeout(() => {
+      // Only show if user is on main screen and result/stage not open
+      if (document.getElementById('main').classList.contains('active') &&
+          !document.getElementById('stage').classList.contains('show') &&
+          !document.getElementById('result').classList.contains('show')) {
+        showHankIdle();
+      }
+      scheduleNext();
+    }, wait);
+  };
+  scheduleNext();
+}
+function stopHankIdleLoop() {
+  if (hankIdleTimer) clearTimeout(hankIdleTimer);
+  if (hankIdleHideTimer) clearTimeout(hankIdleHideTimer);
+}
+
+// Click anywhere on bubble (or X) to dismiss
+document.getElementById('hankIdle').addEventListener('click', hideHankIdle);
+
+// TTS toggle
+document.getElementById('ttsToggle').addEventListener('click', () => {
+  state.ttsOn = !state.ttsOn;
+  localStorage.setItem('wd_tts', state.ttsOn ? 'on' : 'off');
+  const btn = document.getElementById('ttsToggle');
+  btn.classList.toggle('on', state.ttsOn);
+  btn.textContent = state.ttsOn ? '💬' : '🤐';
+  if (state.ttsOn) {
+    // Test line — also primes the engine (some browsers require interaction)
+    hankSpeak("Voice is on, partner.");
+  } else {
+    hankShutUp();
+  }
+});
+if (!state.ttsOn) {
+  const btn = document.getElementById('ttsToggle');
+  btn.classList.remove('on');
+  btn.textContent = '🤐';
+}
+
+// Throw animation toggle
+document.getElementById('animToggle').addEventListener('click', () => {
+  state.throwAnimOn = !state.throwAnimOn;
+  localStorage.setItem('wd_throwanim', state.throwAnimOn ? 'on' : 'off');
+  const btn = document.getElementById('animToggle');
+  btn.classList.toggle('on', state.throwAnimOn);
+  btn.textContent = state.throwAnimOn ? '🎬' : '🚫';
+  playClick();
+});
+if (!state.throwAnimOn) {
+  const btn = document.getElementById('animToggle');
+  btn.classList.remove('on');
+  btn.textContent = '🚫';
+}
+
+// === SPLASH (random Hank quote) ===
+(function randomizeSplashQuote() {
+  const line = hankPick('splash');
+  if (line) {
+    const el = document.getElementById('splashQuote');
+    if (el) el.innerHTML = `"${line.t}"<br>— Doc Hank`;
+  }
+})();
+
+// === SPLASH → MAIN ===
+document.getElementById('enterBtn').addEventListener('click', () => {
+  playDing();
+  document.getElementById('splash').classList.remove('active');
+  document.getElementById('main').classList.add('active');
+  // After a brief beat, kick off the idle bubble loop and greet the user
+  setTimeout(() => {
+    const greet = hankPick('idle');
+    if (greet) showHankIdle(greet);
+    startHankIdleLoop();
+  }, 1800);
+});
+
+// === RENDER UI ===
+function renderCats() {
+  const counts = {};
+  CATEGORIES.forEach(c => counts[c.id] = DESTINATIONS.filter(d => d.category === c.id).length);
+  document.getElementById('cats').innerHTML = CATEGORIES.map(c => `
+    <button class="cat ${state.selectedCats.has(c.id) ? 'active' : ''}" data-cat="${c.id}">
+      <span class="icon">${c.icon}</span>
+      <span class="lbl">${c.label}</span>
+      <span class="count">${counts[c.id]}</span>
+    </button>
+  `).join('');
+  document.querySelectorAll('.cat').forEach(b => {
+    b.addEventListener('click', () => {
+      playClick();
+      const id = b.dataset.cat;
+      if (state.selectedCats.has(id)) state.selectedCats.delete(id);
+      else state.selectedCats.add(id);
+      if (state.selectedCats.size === 0) state.selectedCats.add(id);
+      renderCats(); updatePool();
+    });
+  });
+}
+function renderStates() {
+  document.getElementById('states').innerHTML = STATES.map(s => `
+    <button class="st ${state.selectedStates.has(s) ? 'active' : ''}" data-st="${s}">${s}</button>
+  `).join('');
+  document.querySelectorAll('.st').forEach(b => {
+    b.addEventListener('click', () => {
+      playClick();
+      const s = b.dataset.st;
+      if (state.selectedStates.has(s)) state.selectedStates.delete(s);
+      else state.selectedStates.add(s);
+      renderStates(); updatePool();
+      if (typeof updateRegionChips === 'function') updateRegionChips();
+    });
+  });
+}
+function renderHistory() {
+  const h = document.getElementById('history');
+  if (state.history.length === 0) {
+    h.innerHTML = '<div class="h-empty">No throws yet. Aim for the map.</div>';
+    return;
+  }
+  h.innerHTML = state.history.slice(0, 10).map(item => `
+    <div class="h-item"><span>${item.name}</span><span class="h-state">${item.state}</span></div>
+  `).join('');
+}
+function updatePool() {
+  const pool = getPool();
+  document.getElementById('poolInfo').textContent = `${pool.length} place${pool.length===1?'':'s'} in the pool`;
+  const btn = document.getElementById('throwBtn');
+  btn.disabled = pool.length === 0;
+  btn.classList.toggle('pulse', pool.length > 0);
+}
+function getPool() {
+  return DESTINATIONS.filter(d => {
+    if (!state.selectedCats.has(d.category)) return false;
+    if (!state.selectedStates.has(d.state)) return false;
+    if (state.maxDistance > 0 && state.originLat != null) {
+      if (haversine(state.originLat, state.originLng, d.lat, d.lng) > state.maxDistance) return false;
+    }
+    return true;
+  });
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 3958.8;
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// === HOOKS ===
+document.querySelectorAll('.quick-row .chip').forEach(b => {
+  b.addEventListener('click', () => {
+    playClick();
+    const r = b.dataset.region;
+    if (r === 'all') state.selectedStates = new Set(STATES);
+    else if (r === 'clear') state.selectedStates = new Set();
+    else state.selectedStates = new Set(REGIONS[r]);
+    renderStates(); updatePool(); updateRegionChips();
+  });
+});
+// Highlight whichever region chip matches the current state selection exactly
+function updateRegionChips() {
+  const sel = state.selectedStates;
+  document.querySelectorAll('.quick-row .chip').forEach(chip => {
+    const r = chip.dataset.region;
+    let match = false;
+    if (r === 'all') {
+      match = sel.size === STATES.length;
+    } else if (r === 'clear') {
+      match = sel.size === 0;
+    } else if (REGIONS[r]) {
+      const region = REGIONS[r];
+      match = sel.size === region.length && region.every(s => sel.has(s));
+    }
+    // Keep the "All 50" chip in its solid style; others use .active
+    if (chip.classList.contains('solid')) {
+      chip.classList.toggle('active', false); // solid stays solid; no double-styling
+    } else {
+      chip.classList.toggle('active', match);
+    }
+  });
+}
+// === DISTANCE UI (toggle + slider + origin) ===
+const distSwitch = document.getElementById('distSwitch');
+const distBody = document.getElementById('distBody');
+const distSlider = document.getElementById('distSlider');
+const distVal = document.getElementById('distVal');
+const useLocBtn = document.getElementById('useLoc');
+
+// state.maxDistance: 0 = filter off. When toggle is on, it uses the slider value.
+function updateSliderFill() {
+  const min = parseInt(distSlider.min), max = parseInt(distSlider.max);
+  const v = parseInt(distSlider.value);
+  const pct = ((v - min) / (max - min)) * 100;
+  distSlider.style.background =
+    `linear-gradient(to right, var(--orange) 0%, var(--orange) ${pct}%, rgba(244,234,213,0.2) ${pct}%, rgba(244,234,213,0.2) 100%)`;
+  distVal.textContent = v + ' mi';
+}
+function setDistanceEnabled(on) {
+  distSwitch.classList.toggle('on', on);
+  distSwitch.setAttribute('aria-checked', on ? 'true' : 'false');
+  distBody.classList.toggle('open', on);
+  if (on) {
+    state.maxDistance = parseInt(distSlider.value);
+  } else {
+    state.maxDistance = 0;
+  }
+  updateDistNote();
+  updatePool();
+}
+distSwitch.addEventListener('click', () => {
+  playClick();
+  const willBeOn = !distSwitch.classList.contains('on');
+  setDistanceEnabled(willBeOn);
+});
+distSlider.addEventListener('input', () => {
+  updateSliderFill();
+  if (distSwitch.classList.contains('on')) {
+    state.maxDistance = parseInt(distSlider.value);
+    updateDistNote();
+    updatePool();
+  }
+});
+function updateDistNote() {
+  const note = document.getElementById('distNote');
+  if (state.maxDistance === 0) {
+    note.textContent = 'Distance filter is off — anywhere in the US';
+  } else if (state.originLat == null) {
+    note.textContent = `Set an origin (location or ZIP) to filter within ${state.maxDistance} mi`;
+  } else {
+    const pool = getPool();
+    note.textContent = `Within ${state.maxDistance} mi of your origin · ${pool.length} place${pool.length===1?'':'s'}`;
+  }
+}
+document.getElementById('zip').addEventListener('change', async (e) => {
+  const zip = e.target.value.trim();
+  if (!/^\d{5}$/.test(zip)) return;
+  document.getElementById('distNote').textContent = 'Looking up ZIP…';
+  try {
+    const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const place = data.places[0];
+    state.originLat = parseFloat(place.latitude);
+    state.originLng = parseFloat(place.longitude);
+    useLocBtn.classList.remove('located');
+    // Turn the filter on automatically once an origin is set
+    if (!distSwitch.classList.contains('on')) setDistanceEnabled(true);
+    document.getElementById('distNote').textContent =
+      `Origin: ${place['place name']}, ${place['state abbreviation']} · within ${state.maxDistance} mi`;
+    updatePool();
+  } catch { document.getElementById('distNote').textContent = 'ZIP not found — try another'; }
+});
+useLocBtn.addEventListener('click', () => {
+  playClick();
+  if (!navigator.geolocation) { document.getElementById('distNote').textContent = 'Geolocation unavailable on this device'; return; }
+  document.getElementById('distNote').textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      state.originLat = pos.coords.latitude;
+      state.originLng = pos.coords.longitude;
+      useLocBtn.classList.add('located');
+      useLocBtn.textContent = '★ Location set';
+      if (!distSwitch.classList.contains('on')) setDistanceEnabled(true);
+      document.getElementById('distNote').textContent = `Using your location · within ${state.maxDistance} mi`;
+      updatePool();
+    },
+    () => { document.getElementById('distNote').textContent = 'Could not get location — try ZIP instead'; }
+  );
+});
+// Initialize slider fill on load
+updateSliderFill();
+
+document.querySelectorAll('#dartCount .seg').forEach(b => {
+  b.addEventListener('click', () => {
+    playClick();
+    document.querySelectorAll('#dartCount .seg').forEach(s => s.classList.remove('active'));
+    b.classList.add('active');
+    state.dartCount = parseInt(b.dataset.n);
+    const note = document.getElementById('segNote');
+    note.textContent = state.dartCount === 1 ? '1 dart · one destination' : `${state.dartCount} darts · one per person`;
+    updateThrowBtn();
+  });
+});
+document.querySelectorAll('.aim-opt').forEach(b => {
+  b.addEventListener('click', () => {
+    playClick();
+    document.querySelectorAll('.aim-opt').forEach(o => o.classList.remove('active'));
+    b.classList.add('active');
+    state.aimMode = b.dataset.aim;
+  });
+});
+function updateThrowBtn() {
+  document.getElementById('throwBtn').textContent = state.dartCount === 1 ? 'Throw the Dart' : `Throw ${state.dartCount} Darts`;
+}
+
+document.getElementById('audioToggle').addEventListener('click', () => {
+  state.soundOn = !state.soundOn;
+  localStorage.setItem('wd_sound', state.soundOn ? 'on' : 'off');
+  document.getElementById('audioToggle').textContent = state.soundOn ? '♪ On' : '♪ Off';
+  if (state.soundOn) playDing();
+});
+if (!state.soundOn) document.getElementById('audioToggle').textContent = '♪ Off';
+
+// === MAP ===
+const MAP_W = 975, MAP_H = 610;
+const projection = d3.geoAlbersUsa();
+const geoPath = d3.geoPath(projection);
+const FIPS_TO_STATE = {
+  '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
+  '11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+  '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN',
+  '28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM',
+  '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+  '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
+  '54':'WV','55':'WI','56':'WY'
+};
+let US_STATES_GEO = null, US_NATION_GEO = null;
+let mapLoadPromise = null, mapLoadError = null;
+function loadMapData() {
+  if (mapLoadPromise) return mapLoadPromise;
+  mapLoadPromise = fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(topo => {
+      US_STATES_GEO = topojson.feature(topo, topo.objects.states).features;
+      US_NATION_GEO = topojson.feature(topo, topo.objects.nation);
+      projection.fitSize([MAP_W, MAP_H], US_NATION_GEO);
+      return topo;
+    })
+    .catch(err => { mapLoadError = err; console.error(err); throw err; });
+  return mapLoadPromise;
+}
+function project(lat, lng) {
+  const r = projection([lng, lat]);
+  return r ? { x: r[0], y: r[1] } : { x: MAP_W/2, y: MAP_H/2 };
+}
+// Convert SVG-space coords (0..MAP_W, 0..MAP_H) to a PERCENTAGE position within
+// the stageInner wrapper, accounting for preserveAspectRatio="xMidYMid meet"
+// letterboxing. Without this, darts land in the wrong place because the SVG
+// drawing area doesn't fill the wrapper (there are top/bottom or side margins).
+function svgToWrapperPct(svgX, svgY) {
+  const rect = stageInner.getBoundingClientRect();
+  const wrapW = rect.width, wrapH = rect.height;
+  if (!wrapW || !wrapH) {
+    // Fallback: naive percentage (used if wrapper not measured yet)
+    return { leftPct: (svgX / MAP_W) * 100, topPct: (svgY / MAP_H) * 100 };
+  }
+  const mapAspect = MAP_W / MAP_H;
+  const wrapAspect = wrapW / wrapH;
+  let drawW, drawH, offsetX, offsetY;
+  if (wrapAspect > mapAspect) {
+    // Wrapper is wider than the map → map is height-limited, side margins
+    drawH = wrapH;
+    drawW = drawH * mapAspect;
+    offsetX = (wrapW - drawW) / 2;
+    offsetY = 0;
+  } else {
+    // Wrapper is taller than the map → map is width-limited, top/bottom margins
+    drawW = wrapW;
+    drawH = drawW / mapAspect;
+    offsetX = 0;
+    offsetY = (wrapH - drawH) / 2;
+  }
+  const pxX = offsetX + (svgX / MAP_W) * drawW;
+  const pxY = offsetY + (svgY / MAP_H) * drawH;
+  return { leftPct: (pxX / wrapW) * 100, topPct: (pxY / wrapH) * 100 };
+}
+// Inverse: convert a tap/click position (pixels within the wrapper) to SVG-space coords,
+// accounting for the same letterboxing. Used for manual aim.
+function wrapperPxToSvg(pxX, pxY) {
+  const rect = stageInner.getBoundingClientRect();
+  const wrapW = rect.width, wrapH = rect.height;
+  if (!wrapW || !wrapH) {
+    return { x: (pxX / 1) * MAP_W, y: (pxY / 1) * MAP_H };
+  }
+  const mapAspect = MAP_W / MAP_H;
+  const wrapAspect = wrapW / wrapH;
+  let drawW, drawH, offsetX, offsetY;
+  if (wrapAspect > mapAspect) {
+    drawH = wrapH; drawW = drawH * mapAspect;
+    offsetX = (wrapW - drawW) / 2; offsetY = 0;
+  } else {
+    drawW = wrapW; drawH = drawW / mapAspect;
+    offsetX = 0; offsetY = (wrapH - drawH) / 2;
+  }
+  const svgX = ((pxX - offsetX) / drawW) * MAP_W;
+  const svgY = ((pxY - offsetY) / drawH) * MAP_H;
+  return { x: svgX, y: svgY };
+}
+function pickClosestToPixel(px, py, pool, brokenness = 80) {
+  let best = null, bestDist = Infinity;
+  for (const d of pool) {
+    const p = project(d.lat, d.lng);
+    if (!p) continue;
+    const dx = p.x - px, dy = p.y - py;
+    const dist = Math.sqrt(dx*dx + dy*dy) + (Math.random() - 0.5) * brokenness;
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  return best;
+}
+function buildMapSVG(hitDests) {
+  if (!US_STATES_GEO) {
+    return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}"><rect width="${MAP_W}" height="${MAP_H}" fill="#ecd9b0"/><text x="${MAP_W/2}" y="${MAP_H/2}" text-anchor="middle" font-family="DM Mono" font-size="20" fill="#7c2b1f">${mapLoadError ? 'map failed' : 'loading...'}</text></svg>`;
+  }
+  const cx = MAP_W/2, cy = MAP_H/2;
+  const rings = [280, 220, 160, 100, 50].map((r, i) =>
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b85a2a" stroke-width="0.8" opacity="${0.10 + i*0.03}" stroke-dasharray="3 4"/>`
+  ).join('');
+  const hitStates = new Set((hitDests || []).map(d => d.state));
+  const statesPaths = US_STATES_GEO.map(f => {
+    const fips = String(f.id).padStart(2, '0');
+    const abbr = FIPS_TO_STATE[fips] || '';
+    const isHit = hitStates.has(abbr);
+    const d = geoPath(f);
+    if (!d) return '';
+    return `<path d="${d}" fill="${isHit ? '#e8924b' : '#7c2b1f'}" opacity="${isHit ? 1 : 0.78}" stroke="#2a1f17" stroke-width="${isHit ? 1.6 : 0.5}" stroke-linejoin="round" class="${isHit ? 'hit-state' : ''}"/>`;
+  }).join('');
+  const nationD = geoPath(US_NATION_GEO);
+  return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" preserveAspectRatio="xMidYMid meet">
+    <rect width="${MAP_W}" height="${MAP_H}" fill="#ecd9b0"/>
+    ${rings}
+    <line x1="${cx-320}" y1="${cy}" x2="${cx+320}" y2="${cy}" stroke="#b85a2a" stroke-width="0.5" opacity="0.12" stroke-dasharray="5 5"/>
+    <line x1="${cx}" y1="${cy-240}" x2="${cx}" y2="${cy+240}" stroke="#b85a2a" stroke-width="0.5" opacity="0.12" stroke-dasharray="5 5"/>
+    ${statesPaths}
+    ${nationD ? `<path d="${nationD}" fill="none" stroke="#2a1f17" stroke-width="1.2"/>` : ''}
+  </svg>`;
+}
+loadMapData().catch(e => console.warn(e));
+
+// === THROW ===
+const stage = document.getElementById('stage');
+const stageInner = document.getElementById('stageInner');
+const stageCaption = document.getElementById('stageCaption');
+const stageTitle = document.getElementById('stageTitle');
+const stageCounter = document.getElementById('stageCounter');
+
+document.getElementById('throwBtn').addEventListener('click', startThrow);
+
+async function startThrow() {
+  const pool = getPool();
+  if (pool.length === 0) return;
+
+  // Hide any lingering idle bubble before the show begins
+  hideHankIdle();
+  stopHankIdleLoop();
+
+  // Pre-throw line — Hank reacts to the group size first if it's notable, then a generic pre-throw line
+  let openingLine = null;
+  if (state.dartCount >= 2) {
+    openingLine = hankPick('multi_' + state.dartCount);
+  }
+  if (!openingLine) openingLine = hankPick('pre_throw');
+  if (openingLine) hankSpeak(openingLine.t);
+
+  // Throw wind-up animation (if enabled) — show Hank winding up before the map appears
+  if (state.throwAnimOn) {
+    await playThrowScene();
+  }
+
+  if (!US_STATES_GEO) {
+    stageInner.innerHTML = buildMapSVG([]) + '<div class="grain"></div>';
+    stage.classList.add('show');
+    setStageCaption(openingLine ? openingLine.t : 'Loading the dartboard…');
+    await loadMapData();
+  } else {
+    setStageCaption(openingLine ? openingLine.t : 'Aiming…');
+  }
+
+  const winners = [];
+  const winnerLines = [];   // parallel array of { t, m } for each winner
+  state.lastResults = [];
+  stage.classList.add('show');
+
+  for (let i = 0; i < state.dartCount; i++) {
+    stageTitle.textContent = state.dartCount === 1 ? 'Throwing…' : `Dart ${i+1} of ${state.dartCount}`;
+    stageCounter.textContent = state.dartCount === 1 ? '' : `Person ${i+1}`;
+    const winner = await throwOneDart(pool, winners, i);
+    if (winner) {
+      winners.push(winner);
+      // Pick the hit line for this winner — used both in stage and on the result card
+      const hitLine = hankPickHit(winner.category);
+      winnerLines.push(hitLine);
+      if (hitLine) {
+        setStageCaption(hitLine.t);
+        hankSpeak(hitLine.t);
+      }
+      state.history.unshift({ name: winner.name, state: winner.state, when: Date.now() });
+      await wait(1400);  // let the hit line breathe
+    }
+    if (i < state.dartCount - 1) await wait(500);
+  }
+  state.history = state.history.slice(0, 50);
+  localStorage.setItem('wd_history', JSON.stringify(state.history));
+  state.lastResults = winners;
+  state.lastLines = winnerLines;
+  renderHistory();
+  await wait(400);
+  showResults(winners, winnerLines);
+}
+function setStageCaption(text) {
+  stageCaption.textContent = text;
+  stageCaption.classList.add('hank');
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// Play the throwing wind-up scene (Doc Hank's back, arm raised, speed lines, flash)
+function playThrowScene() {
+  return new Promise(resolve => {
+    const scene = document.getElementById('throwScene');
+    if (!scene) { resolve(); return; }
+    scene.classList.add('show');
+    // Force reflow so the animation restarts cleanly each throw
+    void scene.offsetWidth;
+    scene.classList.add('play');
+    playWhoosh();
+    // The CSS animation runs 1.4s; the "release" punch lands around 0.95s
+    setTimeout(() => { playWhoosh(); }, 600);
+    setTimeout(() => playThunk(), 980);
+    setTimeout(() => {
+      scene.classList.remove('play');
+      scene.classList.remove('show');
+      resolve();
+    }, 1450);
+  });
+}
+
+function throwOneDart(pool, alreadyHit, idx) {
+  return new Promise(async (resolve) => {
+    stageInner.innerHTML = buildMapSVG(alreadyHit);
+    const grain = document.createElement('div'); grain.className = 'grain'; stageInner.appendChild(grain);
+
+    // re-add already-hit darts
+    alreadyHit.forEach((d, i) => addStuckDart(d, i));
+
+    const dart = document.createElement('div');
+    dart.className = 'dart';
+    dart.innerHTML = makeDartSVG(idx + 1);
+    dart.style.display = 'none';
+    stageInner.appendChild(dart);
+
+    if (state.aimMode === 'manual') {
+      const aimLine = hankPick('aiming');
+      if (aimLine) { setStageCaption(aimLine.t); hankSpeak(aimLine.t); }
+      else stageCaption.textContent = 'Tap & hold to aim';
+      manualAim(pool, dart, alreadyHit, idx, resolve);
+    } else {
+      // For auto, the opening line was already set in startThrow on dart 1.
+      // For subsequent darts, give a quick mid-throw teaser.
+      if (idx > 0) {
+        const mid = hankPick('mid_throw');
+        if (mid) { setStageCaption(mid.t); hankSpeak(mid.t); }
+      }
+      autoThrow(pool, dart, alreadyHit, idx, resolve);
+    }
+  });
+}
+
+function makeDartSVG(num) {
+  // A proper dart: steel tip, knurled barrel, shaft, and feathered flight.
+  // Drawn pointing straight down so the tip is at the bottom-center (30,58).
+  return `<svg viewBox="0 0 60 64">
+    <defs>
+      <linearGradient id="barrelGrad${num}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#5a3520"/>
+        <stop offset="0.45" stop-color="#b9803f"/>
+        <stop offset="0.55" stop-color="#d9a05a"/>
+        <stop offset="1" stop-color="#5a3520"/>
+      </linearGradient>
+      <linearGradient id="tipGrad${num}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#6b6b6b"/>
+        <stop offset="0.5" stop-color="#d8d8d8"/>
+        <stop offset="1" stop-color="#6b6b6b"/>
+      </linearGradient>
+    </defs>
+    <!-- soft shadow on the map -->
+    <ellipse cx="33" cy="59" rx="7" ry="2.2" fill="rgba(42,31,23,0.28)"/>
+    <!-- flight (feathers) -->
+    <polygon points="30,4 20,9 24,20 30,17" fill="#b8401f" stroke="#2a1f17" stroke-width="1.2" stroke-linejoin="round"/>
+    <polygon points="30,4 40,9 36,20 30,17" fill="#e8924b" stroke="#2a1f17" stroke-width="1.2" stroke-linejoin="round"/>
+    <line x1="30" y1="5" x2="30" y2="18" stroke="#2a1f17" stroke-width="1"/>
+    <!-- shaft -->
+    <rect x="28.6" y="17" width="2.8" height="11" rx="1" fill="#2a1f17"/>
+    <!-- barrel (knurled) -->
+    <rect x="26.5" y="27" width="7" height="18" rx="2.5" fill="url(#barrelGrad${num})" stroke="#2a1f17" stroke-width="1.2"/>
+    <line x1="27.5" y1="31" x2="32.5" y2="31" stroke="#2a1f17" stroke-width="0.7" opacity="0.5"/>
+    <line x1="27.5" y1="34" x2="32.5" y2="34" stroke="#2a1f17" stroke-width="0.7" opacity="0.5"/>
+    <line x1="27.5" y1="37" x2="32.5" y2="37" stroke="#2a1f17" stroke-width="0.7" opacity="0.5"/>
+    <line x1="27.5" y1="40" x2="32.5" y2="40" stroke="#2a1f17" stroke-width="0.7" opacity="0.5"/>
+    <!-- steel tip -->
+    <polygon points="27.5,45 32.5,45 30,59" fill="url(#tipGrad${num})" stroke="#2a1f17" stroke-width="1"/>
+    <!-- dart number badge on the barrel -->
+    <circle cx="30" cy="36" r="4.4" fill="#1a1410" stroke="#d4a949" stroke-width="0.8"/>
+    <text x="30" y="39" text-anchor="middle" font-family="Bebas Neue, sans-serif" font-size="8" fill="#f4ead5">${num}</text>
+  </svg>`;
+}
+function addStuckDart(d, idx) {
+  const p = project(d.lat, d.lng); if (!p) return;
+  const pos = svgToWrapperPct(p.x, p.y);
+  const stuck = document.createElement('div');
+  stuck.className = 'dart';
+  stuck.innerHTML = makeDartSVG(idx + 1);
+  stuck.style.position = 'absolute';
+  stuck.style.left = pos.leftPct + '%';
+  stuck.style.top = pos.topPct + '%';
+  stuck.style.transform = 'translate(-50%, -85%)';  /* tip sits at the point, not center */
+  stuck.style.zIndex = '8';
+  stageInner.appendChild(stuck);
+}
+
+async function autoThrow(pool, dart, alreadyHit, idx, resolve) {
+  const candidates = pool.filter(p => !alreadyHit.some(a => a.id === p.id));
+  if (candidates.length === 0) { resolve(null); return; }
+  const winner = candidates[Math.floor(Math.random() * candidates.length)];
+  const p = project(winner.lat, winner.lng);
+  // Small wobble in SVG space, then convert to accurate wrapper percentage
+  const wobbleX = (Math.random() - 0.5) * 6;
+  const wobbleY = (Math.random() - 0.5) * 6;
+  const pos = svgToWrapperPct(p.x + wobbleX, p.y + wobbleY);
+  const px = pos.leftPct;
+  const py = pos.topPct;
+
+  await wait(500);
+  playWhoosh();
+  dart.style.display = 'block';
+  dart.style.left = px + '%';
+  dart.style.top = py + '%';
+  dart.classList.add('flying');
+
+  await wait(900);
+  playThunk();
+  stageInner.classList.add('hit');
+  await wait(300);
+  stageInner.classList.remove('hit');
+
+  const hits = [...alreadyHit, winner];
+  redrawWithDarts(hits);
+  stageCaption.textContent = `Bullseye — ${winner.state}`;
+  playDing();
+  await wait(900);
+  resolve(winner);
+}
+function redrawWithDarts(hits) {
+  stageInner.innerHTML = buildMapSVG(hits);
+  const grain = document.createElement('div'); grain.className = 'grain'; stageInner.appendChild(grain);
+  hits.forEach((d, i) => addStuckDart(d, i));
+}
+
+function manualAim(pool, dart, alreadyHit, idx, resolve) {
+  const candidates = pool.filter(p => !alreadyHit.some(a => a.id === p.id));
+  if (candidates.length === 0) { resolve(null); return; }
+
+  const ap = document.createElement('div');
+  ap.className = 'aim-prompt';
+  ap.textContent = 'Tap & hold to aim · release to throw';
+  stageInner.appendChild(ap);
+
+  const chair = document.createElement('div');
+  chair.className = 'crosshair';
+  chair.innerHTML = '<div class="crosshair-ring"></div>';
+  stageInner.appendChild(chair);
+
+  const cm = document.createElement('div');
+  cm.className = 'charge-meter';
+  cm.innerHTML = '<div class="charge-fill"></div>';
+  stageInner.appendChild(cm);
+  const cFill = cm.querySelector('.charge-fill');
+
+  stageInner.classList.add('aimable');
+  let isAiming = false, startTime = 0, aimX = 0, aimY = 0, chargeInterval = null, resolved = false;
+
+  function getEventPoint(e) {
+    const rect = stageInner.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return {
+      x: Math.max(0, Math.min(rect.width, x)),
+      y: Math.max(0, Math.min(rect.height, y)),
+    };
+  }
+  function onDown(e) {
+    e.preventDefault(); if (resolved) return;
+    const { x, y } = getEventPoint(e);
+    aimX = x; aimY = y; isAiming = true; startTime = Date.now();
+    ap.style.display = 'none';
+    chair.classList.add('show');
+    chair.style.left = x + 'px'; chair.style.top = y + 'px';
+    cm.classList.add('show');
+    chargeInterval = setInterval(() => {
+      const t = Math.min(2000, Date.now() - startTime);
+      cFill.style.width = (t / 2000 * 100) + '%';
+      if (t >= 2000) endAim();
+    }, 16);
+  }
+  function onMove(e) {
+    if (!isAiming) return;
+    e.preventDefault();
+    const { x, y } = getEventPoint(e);
+    aimX = x; aimY = y;
+    chair.style.left = x + 'px'; chair.style.top = y + 'px';
+  }
+  function onUp(e) {
+    if (!isAiming || resolved) return;
+    e.preventDefault(); endAim();
+  }
+  function endAim() {
+    if (resolved) return;
+    resolved = true; isAiming = false;
+    clearInterval(chargeInterval);
+    chair.classList.remove('show'); cm.classList.remove('show');
+    stageInner.classList.remove('aimable');
+    const rect = stageInner.getBoundingClientRect();
+    const svgPoint = wrapperPxToSvg(aimX, aimY);
+    const svgX = svgPoint.x;
+    const svgY = svgPoint.y;
+    const charge = Math.min(2000, Date.now() - startTime);
+    const overshoot = charge < 400 ? 60 : (charge > 1500 ? 80 : 30);
+    const winner = pickClosestToPixel(svgX, svgY, candidates, overshoot);
+    if (!winner) { resolve(null); return; }
+    const p = project(winner.lat, winner.lng);
+    const wx = (Math.random() - 0.5) * 8, wy = (Math.random() - 0.5) * 8;
+    const pos = svgToWrapperPct(p.x + wx, p.y + wy);
+    const px = pos.leftPct, py = pos.topPct;
+    playWhoosh();
+    dart.style.display = 'block';
+    dart.style.left = px + '%'; dart.style.top = py + '%';
+    dart.classList.add('flying');
+    stageCaption.textContent = 'Released…';
+    setTimeout(() => {
+      playThunk();
+      stageInner.classList.add('hit');
+      setTimeout(() => stageInner.classList.remove('hit'), 300);
+      const hits = [...alreadyHit, winner];
+      redrawWithDarts(hits);
+      stageCaption.textContent = `Hit — ${winner.state}`;
+      playDing();
+      setTimeout(() => resolve(winner), 900);
+    }, 900);
+    stageInner.removeEventListener('mousedown', onDown);
+    stageInner.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    stageInner.removeEventListener('touchstart', onDown);
+    stageInner.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onUp);
+  }
+  stageInner.addEventListener('mousedown', onDown);
+  stageInner.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  stageInner.addEventListener('touchstart', onDown, { passive: false });
+  stageInner.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onUp);
+}
+
+// === RESULTS ===
+function showResults(winners, lines) {
+  stage.classList.remove('show');
+  const stack = document.getElementById('cardsStack');
+  document.getElementById('resultTitle').textContent = winners.length === 1 ? 'Your destination' : `${winners.length} destinations`;
+  document.getElementById('resultSub').textContent = winners.length === 1 ? 'Approved by Doc Hank' : 'Scroll to see each — one per person';
+
+  // Pager dots
+  const pager = document.getElementById('resultPager');
+  pager.innerHTML = winners.length > 1 ? winners.map((_, i) => `<div class="dot ${i===0?'active':''}"></div>`).join('') : '';
+
+  // Make sure we always have a line per winner (fall back to picking fresh ones)
+  const safeLines = winners.map((w, i) => (lines && lines[i]) || hankPickHit(w.category) || { t: "Pack the truck.", m: "smug" });
+
+  stack.innerHTML = winners.map((d, i) => {
+    const cat = CATEGORIES.find(c => c.id === d.category);
+    const line = safeLines[i];
+    // Mood from the line drives the Hank portrait — no more random
+    const expr = line && line.m && HANK_EXPRESSIONS.includes(line.m) ? line.m : HANK_EXPRESSIONS[i % HANK_EXPRESSIONS.length];
+    const stamp = STAMPS[i % STAMPS.length];
+    const rotClass = i % 2 === 0 ? '' : 'r2';
+    return `
+      <div class="result-card">
+        <div class="card-paper ${rotClass}">
+          ${winners.length > 1 ? `<div class="card-number">Dart ${i+1}</div>` : ''}
+          <div class="card-stamp"><img src="assets/stamp-${stamp}.jpg" alt="" data-stamp-fallback="${stamp}"/></div>
+          <div class="card-img" data-img="${d.id}">
+            <img src="assets/dart-impact.jpeg" alt="" data-fallback="1"/>
+          </div>
+          <div class="card-content">
+            <div class="ticket-label">▼ Destination ▼</div>
+            <div class="card-state">STATE OF ${stateFullName(d.state)}</div>
+            <div class="card-name">${d.name}</div>
+            <div class="card-cat">${cat.icon}  ${cat.label}</div>
+            <div class="card-why-label">Why this place</div>
+            <div class="card-why">${d.why}</div>
+            <div class="card-foot">
+              <button class="primary" data-map="${d.lat},${d.lng}|${encodeURIComponent(d.name)}">Open Maps</button>
+              <button data-search="${encodeURIComponent(d.name + ' ' + d.state)}">Search Web</button>
+              <button data-hanksay="${i}">Hank Says</button>
+            </div>
+          </div>
+          <div class="card-hank"><img src="assets/hank-${expr}.jpg" alt=""/></div>
+          ${line ? `<div class="card-hank-quote">"${line.t}"</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  stack.querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
+    const [coords, name] = b.dataset.map.split('|');
+    window.open(`https://www.google.com/maps/search/?api=1&query=${coords}&query_place_id=${name}`, '_blank');
+  }));
+  stack.querySelectorAll('[data-search]').forEach(b => b.addEventListener('click', () => {
+    window.open(`https://www.google.com/search?q=${b.dataset.search}`, '_blank');
+  }));
+  // "Hank Says" — re-roll a hit line and update both the bubble and the portrait
+  stack.querySelectorAll('[data-hanksay]').forEach(b => b.addEventListener('click', () => {
+    const idx = parseInt(b.dataset.hanksay, 10);
+    const winner = winners[idx];
+    if (!winner) return;
+    const newLine = hankPickHit(winner.category);
+    if (!newLine) return;
+    const card = b.closest('.card-paper');
+    if (!card) return;
+    const quoteEl = card.querySelector('.card-hank-quote');
+    if (quoteEl) quoteEl.textContent = `"${newLine.t}"`;
+    const portrait = card.querySelector('.card-hank img');
+    if (portrait && newLine.m) portrait.src = `assets/hank-${newLine.m}.jpg`;
+    hankSpeak(newLine.t);
+  }));
+
+  // Pager dot update on scroll — also speak the Hank line for the newly-active card
+  let lastActiveIdx = 0;
+  stack.addEventListener('scroll', () => {
+    const cards = stack.querySelectorAll('.result-card');
+    const stackTop = stack.scrollTop;
+    let activeIdx = 0;
+    cards.forEach((c, i) => {
+      if (c.offsetTop <= stackTop + 50) activeIdx = i;
+    });
+    pager.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+    if (activeIdx !== lastActiveIdx) {
+      lastActiveIdx = activeIdx;
+      const ln = safeLines[activeIdx];
+      if (ln) hankSpeak(ln.t);
+    }
+  });
+
+  document.getElementById('result').classList.add('show');
+  winners.forEach(d => fetchImage(d));
+
+  // Speak the first card's line out loud right away (the stage already did, but result view is its own moment)
+  // Skip if we just spoke it in the stage — the stage's speak was less than a second ago in most flows.
+  // Letting it ride is fine since speechSynthesis.cancel() inside hankSpeak prevents overlap.
+}
+
+async function fetchImage(d) {
+  const el = document.querySelector(`[data-img="${d.id}"]`);
+  if (!el) return;
+  const imgEl = el.querySelector('img');
+  if (!imgEl) return;
+
+  if (state.imageCache[d.id]) {
+    if (state.imageCache[d.id] !== 'NONE') {
+      imgEl.src = state.imageCache[d.id];
+      imgEl.removeAttribute('data-fallback');
+    }
+    return;
+  }
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(d.name)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const img = data.thumbnail?.source || data.originalimage?.source;
+    if (img) {
+      imgEl.src = img;
+      imgEl.removeAttribute('data-fallback');
+      state.imageCache[d.id] = img;
+      localStorage.setItem('wd_img_cache', JSON.stringify(state.imageCache));
+    } else {
+      state.imageCache[d.id] = 'NONE';
+    }
+  } catch {
+    state.imageCache[d.id] = 'NONE';
+  }
+}
+
+function stateFullName(abbr) {
+  const m = {AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'};
+  return m[abbr] || abbr;
+}
+
+document.getElementById('throwAgain').addEventListener('click', () => {
+  hankShutUp();
+  document.getElementById('result').classList.remove('show');
+  setTimeout(startThrow, 200);
+});
+document.getElementById('closeResult').addEventListener('click', () => {
+  hankShutUp();
+  document.getElementById('result').classList.remove('show');
+  // Restart the idle loop now that the user's back on the main screen
+  startHankIdleLoop();
+});
+
+// === SHARE ===
+document.getElementById('shareResult').addEventListener('click', () => generateShareImage(state.lastResults));
+document.getElementById('closeShare').addEventListener('click', () => document.getElementById('sharePreview').classList.remove('show'));
+document.getElementById('downloadShare').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = `wanderdart-${Date.now()}.png`;
+  link.href = document.getElementById('shareCanvas').toDataURL('image/png');
+  link.click();
+});
+
+function generateShareImage(winners) {
+  if (!winners || winners.length === 0) return;
+  const canvas = document.getElementById('shareCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = '#1a1410'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 4000; i++) {
+    ctx.fillStyle = `rgba(244,234,213,${Math.random() * 0.04})`;
+    ctx.fillRect(Math.random() * W, Math.random() * H, 1.5, 1.5);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e8924b';
+  ctx.font = 'bold 28px monospace';
+  ctx.fillText('★  WANDERDART  ★', W/2, 70);
+  ctx.fillStyle = '#7c2b1f';
+  ctx.font = '700 100px Georgia, serif';
+  ctx.fillText('Wander·dart', W/2 + 5, 175 + 5);
+  ctx.fillStyle = '#f4ead5';
+  ctx.fillText('Wander·dart', W/2, 175);
+  ctx.fillStyle = '#d4a949';
+  ctx.font = '20px monospace';
+  ctx.fillText('OUR DART(S) LANDED HERE', W/2, 220);
+
+  const startY = 270;
+  const itemH = winners.length === 1 ? 700 : winners.length === 2 ? 380 : winners.length === 3 ? 260 : winners.length === 4 ? 200 : 165;
+  winners.forEach((d, i) => {
+    const y = startY + i * (itemH + 10);
+    const cat = CATEGORIES.find(c => c.id === d.category);
+    ctx.fillStyle = '#ecd9b0';
+    ctx.fillRect(60, y, W - 120, itemH);
+    ctx.strokeStyle = '#2a1f17'; ctx.lineWidth = 3;
+    ctx.strokeRect(60, y, W - 120, itemH);
+    ctx.fillStyle = '#7c2b1f';
+    ctx.fillRect(75, y + itemH, W - 120, 8);
+    ctx.fillRect(W - 60, y + 15, 8, itemH);
+
+    if (winners.length > 1) {
+      ctx.fillStyle = '#e8924b';
+      ctx.fillRect(85, y - 18, 120, 38);
+      ctx.strokeStyle = '#2a1f17'; ctx.lineWidth = 3;
+      ctx.strokeRect(85, y - 18, 120, 38);
+      ctx.fillStyle = '#2a1f17';
+      ctx.font = 'bold 22px Georgia, serif';
+      ctx.fillText(`Dart ${i+1}`, 145, y + 8);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#b85a2a';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText(`STATE OF ${stateFullName(d.state).toUpperCase()}`, 100, y + (winners.length === 1 ? 90 : 55));
+    ctx.fillStyle = '#2a1f17';
+    const nameSize = winners.length === 1 ? 64 : winners.length === 2 ? 44 : winners.length <= 3 ? 36 : 28;
+    ctx.font = `bold ${nameSize}px Georgia, serif`;
+    let name = d.name;
+    while (ctx.measureText(name).width > W - 180 && name.length > 10) name = name.slice(0, -1);
+    if (name !== d.name) name = name.slice(0, -3) + '...';
+    ctx.fillText(name, 100, y + (winners.length === 1 ? 170 : winners.length <= 3 ? 105 : 85));
+    ctx.fillStyle = '#7c2b1f';
+    ctx.font = '14px monospace';
+    ctx.fillText(`${cat.icon}  ${cat.label.toUpperCase()}`, 100, y + (winners.length === 1 ? 210 : winners.length <= 3 ? 140 : 110));
+    if (winners.length <= 2) {
+      ctx.fillStyle = '#2a1f17';
+      ctx.font = 'italic 22px Georgia, serif';
+      const maxW = W - 200, words = d.why.split(' ');
+      let line = '', lineY = y + (winners.length === 1 ? 310 : 220);
+      for (const w of words) {
+        const test = line + w + ' ';
+        if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, 100, lineY); line = w + ' '; lineY += 32; }
+        else line = test;
+      }
+      ctx.fillText(line, 100, lineY);
+    }
+    ctx.textAlign = 'center';
+  });
+
+  ctx.fillStyle = '#d4a949';
+  ctx.font = '16px monospace';
+  ctx.fillText('PIN A PLACE  ·  HIT THE ROAD  ·  WANDERDART', W/2, H - 40);
+
+  document.getElementById('sharePreview').classList.add('show');
+}
+
+// === INIT ===
+renderCats(); renderStates(); renderHistory(); updatePool(); updateDistNote(); updateThrowBtn();
+updateRegionChips();
+
+// === IMAGE FALLBACK SYSTEM ===
+// Try multiple variants in order: extension swaps and (for stamps) prefix swaps.
+// This means image filenames can use any extension on disk and still work,
+// and stamp-* can also be found as hank-* if that's how they were saved.
+function installImageFallback(img) {
+  if (img.dataset.fallbackInstalled) return;
+  img.dataset.fallbackInstalled = '1';
+  const originalSrc = img.getAttribute('src');
+  if (!originalSrc || !originalSrc.includes('.')) return;
+
+  // Build a list of URL candidates to try in order
+  const candidates = [];
+  const lastDot = originalSrc.lastIndexOf('.');
+  const basePath = originalSrc.substring(0, lastDot);
+  const exts = ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG'];
+
+  // 1) Try every extension with the original path
+  for (const ext of exts) candidates.push(basePath + ext);
+
+  // 2) If this is a stamp image, also try with hank- prefix
+  //    (sometimes stamp images got saved under hank- prefix by mistake)
+  if (img.dataset.stampFallback) {
+    const stampName = img.dataset.stampFallback;
+    for (const ext of exts) candidates.push(`assets/hank-${stampName}${ext}`);
+  }
+
+  // De-duplicate while preserving order
+  const seen = new Set();
+  const uniqueCandidates = candidates.filter(c => {
+    if (seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+
+  let attemptIdx = 0;
+  // Find the index of the original src in our list (so we skip past it)
+  const originalIdx = uniqueCandidates.indexOf(originalSrc);
+  if (originalIdx >= 0) attemptIdx = originalIdx;
+
+  img.addEventListener('error', function onError() {
+    attemptIdx++;
+    if (attemptIdx >= uniqueCandidates.length) {
+      img.removeEventListener('error', onError);
+      return;
+    }
+    img.src = uniqueCandidates[attemptIdx];
+  });
+}
+// Install fallback on all existing images
+function installFallbackOnAllImages() {
+  document.querySelectorAll('img').forEach(installImageFallback);
+}
+installFallbackOnAllImages();
+// Also watch for dynamically-added images (result cards, idle bubble, etc.)
+const imgObserver = new MutationObserver(mutations => {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      if (node.tagName === 'IMG') installImageFallback(node);
+      const inner = node.querySelectorAll ? node.querySelectorAll('img') : [];
+      inner.forEach(installImageFallback);
+    }
+  }
+});
+imgObserver.observe(document.body, { childList: true, subtree: true });
+
+// Stop Hank's voice when the tab goes to background or page unloads
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hankShutUp();
+});
+window.addEventListener('pagehide', hankShutUp);
+</script>
+</body>
+</html>
