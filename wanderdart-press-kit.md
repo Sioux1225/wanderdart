@@ -1,7 +1,5 @@
 # Wanderdart — Press Kit
 
-> **メモ（作者向け）:** これは英語圏のメディア・インフルエンサーにそのまま渡せる資料です。角括弧 `[ ]` の部分（リンク・価格・公開日など）を、決まり次第あなたの情報に差し替えてください。連絡先メールも実際のものに。
-
 ---
 
 ## The one-liner
@@ -67,7 +65,7 @@ No account, no tracking, and it works offline. Open it, throw, go.
 | **Data & privacy** | No account required; works offline; no personal-data tracking |
 | **Maker** | [Kamino Suguru], indie developer [Tokyo, Japan] |
 | **Website** | [https://sioux1225.github.io/wanderdart/] |
-| **Press contact** | [sioux1225@gmail.com] |
+| **Press contact** | [wanderdart2026@gmail.com] |
 
 ## Boilerplate ("About Wanderdart")
 
